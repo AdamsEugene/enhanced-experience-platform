@@ -1,17 +1,19 @@
 import { FormDefinition, AIAnalysis } from "../types";
 import { v4 as uuidv4 } from "uuid";
+import OpenAI from "openai";
 
 export interface AIService {
   generateForm(userIntent: string, context?: string): Promise<FormDefinition>;
   processFormSubmission(formId: string, responses: any): Promise<AIAnalysis>;
 }
 
-export class ClaudeAIService implements AIService {
-  private apiKey: string;
-  private baseUrl = "https://api.anthropic.com/v1/messages";
+export class OpenAIService implements AIService {
+  private openai: OpenAI;
 
   constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    this.openai = new OpenAI({
+      apiKey: apiKey,
+    });
   }
 
   async generateForm(
@@ -21,47 +23,35 @@ export class ClaudeAIService implements AIService {
     try {
       const prompt = this.buildFormGenerationPrompt(userIntent, context);
 
-      console.log("Making Claude API request...");
-      console.log("API Key length:", this.apiKey.length);
-      console.log("API Key starts with:", this.apiKey.substring(0, 7));
+      console.log("Making OpenAI API request...");
 
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: {
-          "x-api-key": this.apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at creating structured forms and decision trees. You always respond with valid JSON only, no explanations or markdown.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 4095,
+        temperature: 0.1,
       });
 
-      console.log("Claude API response status:", response.status);
-      console.log(
-        "Claude API response headers:",
-        Object.fromEntries(response.headers.entries())
-      );
+      console.log("OpenAI API response received");
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Claude API error response:", errorText);
-        throw new Error(
-          `Claude API error: ${response.status} ${response.statusText} - ${errorText}`
-        );
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
       }
 
-      const data = await response.json();
-      console.log(
-        "Claude API response received, content length:",
-        (data as any).content[0].text.length
-      );
+      console.log("Response content length:", content.length);
 
-      const formJson = this.extractJSONFromResponse(
-        (data as any).content[0].text
-      );
+      const formJson = this.extractJSONFromResponse(content);
 
       return {
         ...formJson,
@@ -86,30 +76,29 @@ export class ClaudeAIService implements AIService {
     try {
       const prompt = this.buildSubmissionAnalysisPrompt(formId, responses);
 
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: {
-          "x-api-key": this.apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
-        }),
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at analyzing form data and providing actionable insights. You always respond with valid JSON only, no explanations or markdown.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 1500,
+        temperature: 0.1,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Claude API error response:", errorText);
-        throw new Error(
-          `Claude API error: ${response.status} ${response.statusText} - ${errorText}`
-        );
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
       }
 
-      const data = await response.json();
-      return this.extractJSONFromResponse((data as any).content[0].text);
+      return this.extractJSONFromResponse(content);
     } catch (error) {
       console.error("Error processing form submission:", error);
       throw new Error(
@@ -239,7 +228,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
 
       return JSON.parse(cleaned);
     } catch (error) {
-      console.error("Failed to parse JSON from Claude response:", response);
+      console.error("Failed to parse JSON from OpenAI response:", response);
       throw new Error("Invalid JSON response from AI service");
     }
   }

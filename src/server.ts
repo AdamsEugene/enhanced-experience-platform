@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { ClaudeAIService } from "./services/aiService";
+import { OpenAIService } from "./services/aiService";
 import {
   FormDefinition,
   FormGenerationRequest,
@@ -30,13 +30,13 @@ const generatedForms = new Map<string, FormDefinition>();
 const formSubmissions = new Map<string, any>();
 
 // Initialize AI service
-const claudeApiKey = process.env.CLAUDE_API_KEY;
-if (!claudeApiKey) {
-  console.error("CLAUDE_API_KEY environment variable is required");
+const openaiApiKey = process.env.OPENAI_API_KEY;
+if (!openaiApiKey) {
+  console.error("OPENAI_API_KEY environment variable is required");
   process.exit(1);
 }
 
-const aiService = new ClaudeAIService(claudeApiKey);
+const aiService = new OpenAIService(openaiApiKey);
 
 // Middleware for logging
 app.use((req, res, next) => {
@@ -51,6 +51,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     formsGenerated: generatedForms.size,
     totalSubmissions: formSubmissions.size,
+    aiProvider: "OpenAI GPT-4o",
   });
 });
 
@@ -223,6 +224,8 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
-    `🤖 AI Service: ${claudeApiKey ? "Configured" : "Missing API Key"}`
+    `🤖 AI Service: OpenAI GPT-4o ${
+      openaiApiKey ? "Configured" : "Missing API Key"
+    }`
   );
 });
