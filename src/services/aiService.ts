@@ -31,7 +31,7 @@ export class OpenAIService implements AIService {
           {
             role: "system",
             content:
-              "You are an expert at creating structured forms and decision trees. You always respond with valid JSON only, no explanations or markdown.",
+              "You are an expert at creating comprehensive, detailed forms and decision trees. You create thorough, professional-grade forms that cover all possible scenarios and gather complete information. You always respond with valid JSON only, no explanations or markdown.",
           },
           {
             role: "user",
@@ -114,67 +114,81 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-Generate a decision tree form based on this user request: "${userIntent}"
+Generate a comprehensive, detailed decision tree form based on this user request: "${userIntent}"
 ${context ? `Additional context: ${context}` : ""}
 
-Create a JSON form definition that breaks down the user's request into multiple logical steps/slides. Each slide should gather specific information needed to complete their task.
+This should be a PROFESSIONAL-GRADE, COMPREHENSIVE form that covers ALL possible scenarios and gathers COMPLETE information. Think like a real insurance company or professional service provider.
+
+Create a JSON form definition with 15-25+ pages that breaks down the user's request into multiple logical steps/slides. Each slide should gather specific information needed to complete their task comprehensively.
 
 Follow this exact structure:
 {
-  "name": "Form Title",
-  "description": "Brief description of what this form accomplishes",
+  "name": "Professional Form Title",
+  "description": "Comprehensive description of what this form accomplishes",
   "pages": [
     {
       "id": "page-1",
       "title": "Clear question or instruction for the user",
-      "order": 1,
       "inputType": "single-choice|multi-choice|mixed|display-only",
       "options": [
         {
           "id": "option-id",
           "label": "Button or field label",
           "value": "option-value",
-          "type": "toggle|text-input|select", // only for mixed inputType
+          "type": "toggle|text|select", // only for mixed inputType
           "routeTo": "next-page-id", // only for single-choice
           "required": true // for text inputs
         }
       ],
       "routeButton": {
-        "id": "continue-btn",
         "label": "Continue",
         "routeTo": "next-page-id"
-      }, // only for multi-choice and mixed
-      "displayContent": [
-        {
-          "type": "info|success|warning|error",
-          "text": "Information to display"
-        }
-      ] // only for display-only
+      } // only for multi-choice and mixed
     }
   ]
 }
 
 Input Type Rules:
 - "single-choice": User picks ONE option, each option has routeTo (no routeButton needed)
-- "multi-choice": User can select MULTIPLE options, needs routeButton to continue
-- "mixed": Combination of text inputs, selects, and toggles, needs routeButton
-- "display-only": Information display with displayContent array
+- "multi-choice": User can select MULTIPLE options, needs routeButton to continue  
+- "mixed": Combination of text inputs and toggles, needs routeButton
+- "display-only": Information display with confirmation details
 
-Form Design Principles:
-1. Start with broad categorization questions
-2. Progressively gather more specific details
-3. Keep 2-4 options per page maximum
-4. Create logical flow that builds understanding
-5. End with confirmation/summary page
-6. Think about the user's mental model and workflow
-7. Each page should have a single, clear purpose
-8. Use descriptive, user-friendly language
+COMPREHENSIVE Form Requirements:
+1. Start with broad categorization (incident type, severity, etc.)
+2. Branch into specific scenarios with detailed paths
+3. Gather ALL relevant details for each scenario:
+   - Incident details (date, time, location, description)
+   - Parties involved (names, contact info, insurance details)
+   - Damage assessment (detailed descriptions, photos, estimates)
+   - Evidence gathering (police reports, witnesses, documentation)
+   - Injury information (if applicable)
+   - Vehicle information (make, model, year, VIN, license plates)
+   - Insurance preferences (repair shops, rental cars, claim handling)
+   - Contact information and communication preferences
+   - Legal acknowledgments and authorizations
+4. Include multiple decision branches for different scenarios:
+   - Different types of incidents (collision, theft, weather, vandalism)
+   - Different fault scenarios (at-fault, not at-fault, unclear, shared)
+   - Different damage levels (minor, major, total loss)
+   - Different injury levels (none, minor, serious)
+   - Different evidence availability
+5. End with comprehensive review and confirmation pages
+6. Use professional, clear language throughout
 
-For the user intent "${userIntent}", think about:
-- What information is needed to complete this task?
-- What decisions does the user need to make?
-- What is the logical order of information gathering?
-- What are the different scenarios or paths they might take?
+For auto insurance specifically, include paths for:
+- Vehicle-to-vehicle collisions (fault determination, other driver info)
+- Single-vehicle accidents (object strikes, rollovers)
+- Theft and break-ins (police reports, stolen items)
+- Weather damage (hail, flood, wind, lightning)
+- Vandalism and malicious damage
+- Animal collisions
+- Comprehensive damage assessment flows
+- Injury documentation procedures
+- Towing and storage arrangements
+- Total loss procedures
+
+Create AT LEAST 15-20 pages with multiple branching paths. Be thorough and professional.
 
 RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN BLOCKS.
     `;
