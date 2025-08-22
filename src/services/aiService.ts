@@ -136,129 +136,135 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-Generate a comprehensive, professional-grade decision tree form based on this user request: "${userIntent}"
+Generate a COMPREHENSIVE, DETAILED decision tree form based on: "${userIntent}"
 ${context ? `Additional context: ${context}` : ""}
 
-Analyze the user's intent and create a detailed, multi-step form that helps them accomplish their goal through guided questions and information gathering.
+You must create a PROFESSIONAL-GRADE form with 20-30+ pages that covers ALL possible scenarios and branches, similar to what a real service company would use.
 
-CRITICAL STRUCTURE RULES:
+COMPREHENSIVE COVERAGE REQUIRED:
+Create extensive decision trees with multiple branches covering every possible scenario the user might encounter. Think like a professional service provider who needs complete information.
+
+For "${userIntent}", create detailed flows covering:
+- Initial categorization with 3-4+ major branches
+- Each branch should have 5-10+ sub-pages for detailed information gathering
+- Multiple decision points within each branch
+- Comprehensive data collection at each step
+- Professional follow-up questions and clarifications
+- Final resolution with detailed next steps
+
+MANDATORY STRUCTURE RULES:
 
 1. "single-choice" pages:
-   - Must have options array with 2-4 options
-   - Each option MUST have routeTo field
-   - NO routeButton on the page
-   - Options do NOT have type or required fields
+   - Must have 2-4 options in the options array
+   - Each option MUST have routeTo field pointing to different pages
+   - NO routeButton on these pages
+   - Options only need: id, label, value, routeTo
 
 2. "multi-choice" pages:
-   - Must have options array with 2-6 options  
-   - Options do NOT have routeTo field
+   - Must have 3-6 options in the options array
+   - Options do NOT have routeTo (just id, label, value)
    - Page MUST have routeButton with label and routeTo
-   - Options are for selecting multiple items
 
 3. "mixed" pages:
-   - Must have options array with text inputs and toggles
-   - Text inputs have: type:"text", required:true/false
-   - Toggle inputs have: type:"toggle"
-   - Page MUST have routeButton with label and routeTo
+   - Must have 2-6 options combining text inputs and toggles
+   - Text inputs: type:"text", required:true/false, value:""
+   - Toggles: type:"toggle", value:"toggle-name"
+   - Page MUST have routeButton
 
 4. "display-only" pages:
-   - NO options field at all (remove it completely)
-   - NO routeButton unless continuing to another page
-   - Used for showing information or final confirmation
+   - NO options field at all (completely remove it)
+   - Optional routeButton only if continuing to another page
+   - Used for final confirmation, results, or information display
 
-JSON Structure Example:
+JSON Structure (create 20-30+ pages like this):
 {
-  "name": "Form Title Based on User Request",
-  "description": "What this form helps the user accomplish",
+  "name": "Comprehensive [Service Type] Assistant",
+  "description": "Complete professional-grade form covering all aspects of [user's need]",
   "pages": [
     {
       "id": "page-1",
-      "title": "What specific aspect of [user's request] do you need help with?",
+      "title": "What specific type of [user's need] situation are you dealing with?",
       "inputType": "single-choice",
       "options": [
         {
-          "id": "opt-1",
-          "label": "Option relevant to their need",
-          "value": "option1",
+          "id": "primary-type-1",
+          "label": "Major category 1 relevant to request",
+          "value": "category-1",
           "routeTo": "page-2"
         },
         {
-          "id": "opt-2", 
-          "label": "Another relevant option",
-          "value": "option2",
-          "routeTo": "page-3"
+          "id": "primary-type-2",
+          "label": "Major category 2 relevant to request", 
+          "value": "category-2",
+          "routeTo": "page-branch-2"
+        },
+        {
+          "id": "primary-type-3",
+          "label": "Major category 3 relevant to request",
+          "value": "category-3", 
+          "routeTo": "page-branch-3"
+        },
+        {
+          "id": "primary-type-4",
+          "label": "Other or complex situation",
+          "value": "complex",
+          "routeTo": "page-complex-1"
         }
       ]
     },
     {
       "id": "page-2",
-      "title": "Tell us more details about your situation",
-      "inputType": "mixed",
+      "title": "For [category 1], what specific sub-type applies to your situation?",
+      "inputType": "single-choice",
       "options": [
         {
-          "id": "details-text",
-          "type": "text",
-          "label": "Describe your situation",
-          "value": "",
-          "required": true
+          "id": "sub-type-1a",
+          "label": "Specific scenario A",
+          "value": "scenario-a",
+          "routeTo": "page-3"
         },
         {
-          "id": "urgent-toggle",
-          "type": "toggle", 
-          "label": "This is urgent",
-          "value": "urgent"
-        }
-      ],
-      "routeButton": {
-        "label": "Continue",
-        "routeTo": "page-4"
-      }
-    },
-    {
-      "id": "page-3",
-      "title": "Which of these apply to your situation? (Select all that apply)",
-      "inputType": "multi-choice",
-      "options": [
-        {
-          "id": "option-a",
-          "label": "Relevant choice A",
-          "value": "choice-a"
+          "id": "sub-type-1b", 
+          "label": "Specific scenario B",
+          "value": "scenario-b",
+          "routeTo": "page-4"
         },
         {
-          "id": "option-b",
-          "label": "Relevant choice B", 
-          "value": "choice-b"
+          "id": "sub-type-1c",
+          "label": "Specific scenario C",
+          "value": "scenario-c",
+          "routeTo": "page-5"
         }
-      ],
-      "routeButton": {
-        "label": "Continue",
-        "routeTo": "page-4"
-      }
-    },
-    {
-      "id": "page-4",
-      "title": "Based on your responses, here are your next steps",
-      "inputType": "display-only"
+      ]
     }
   ]
 }
 
-For "${userIntent}", create 15-20+ pages with:
-- Clear progression from general to specific information
-- Multiple decision paths based on different scenarios  
-- Comprehensive data collection relevant to their need
-- Professional, helpful guidance throughout
-- Actionable next steps or resolution
+COMPREHENSIVE REQUIREMENTS:
+1. Create MINIMUM 20-30 pages with deep branching
+2. Each major category should have 5-8 detailed pages
+3. Include extensive information gathering pages (mixed type)
+4. Multiple decision points and scenario branches
+5. Professional, detailed questions throughout
+6. End with comprehensive summary/confirmation pages
 
-VALIDATION CHECKLIST:
-✓ Every single-choice page has options with routeTo, no routeButton
-✓ Every multi-choice page has options without routeTo, has routeButton  
-✓ Every mixed page has text/toggle options, has routeButton
-✓ Every display-only page has NO options field at all
-✓ All routeTo values reference actual page IDs in the form
-✓ No empty options arrays anywhere
-✓ No trailing commas in JSON
-✓ All braces and brackets properly matched
+For "${userIntent}" specifically:
+- Start with broad categorization (3-4 major paths)
+- Each path should drill down into specific scenarios
+- Gather comprehensive details at each step
+- Include edge cases and complex situations
+- Professional language and thorough coverage
+- Multiple routes converging to final steps
+
+VALIDATION REQUIREMENTS:
+✓ 20-30+ pages minimum
+✓ Multiple branches from main categories
+✓ No empty options arrays (except display-only has none)
+✓ All routeTo values reference actual page IDs
+✓ Comprehensive coverage of all scenarios
+✓ Professional, detailed approach throughout
+
+Create a thorough, extensive form that covers every aspect of "${userIntent}" like a professional service would.
 
 RESPOND ONLY WITH COMPLETE, VALID JSON.`;
   }
@@ -477,13 +483,18 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
         page.inputType = "mixed";
       }
 
-      // Fix options based on inputType
+      // Handle different input types
       if (page.inputType === "display-only") {
-        // Display-only pages should not have options at all
+        // Display-only pages should NEVER have options
         delete page.options;
 
         // Remove routeButton if it routes to itself (invalid)
         if (page.routeButton && page.routeButton.routeTo === page.id) {
+          delete page.routeButton;
+        }
+
+        // If it's the last page, remove routeButton entirely
+        if (index === pages.length - 1) {
           delete page.routeButton;
         }
       } else {
@@ -498,17 +509,8 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
             page.options = [
               {
                 id: `opt-${index}-1`,
-                label: "Yes",
-                value: "yes",
-                routeTo:
-                  index + 1 < pages.length
-                    ? pages[index + 1].id || `page-${index + 2}`
-                    : `page-end`,
-              },
-              {
-                id: `opt-${index}-2`,
-                label: "No",
-                value: "no",
+                label: "Continue",
+                value: "continue",
                 routeTo:
                   index + 1 < pages.length
                     ? pages[index + 1].id || `page-${index + 2}`
@@ -522,22 +524,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
                 label: "Option 1",
                 value: "option1",
               },
-              {
-                id: `opt-${index}-2`,
-                label: "Option 2",
-                value: "option2",
-              },
             ];
-            // Ensure routeButton exists for multi-choice
-            if (!page.routeButton) {
-              page.routeButton = {
-                label: "Continue",
-                routeTo:
-                  index + 1 < pages.length
-                    ? pages[index + 1].id || `page-${index + 2}`
-                    : `page-end`,
-              };
-            }
           } else if (page.inputType === "mixed") {
             page.options = [
               {
@@ -548,63 +535,63 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
                 required: true,
               },
             ];
-            // Ensure routeButton exists for mixed
-            if (!page.routeButton) {
-              page.routeButton = {
-                label: "Continue",
-                routeTo:
-                  index + 1 < pages.length
-                    ? pages[index + 1].id || `page-${index + 2}`
-                    : `page-end`,
-              };
-            }
+          }
+        }
+
+        // Ensure routeButton exists for multi-choice and mixed
+        if (
+          (page.inputType === "multi-choice" || page.inputType === "mixed") &&
+          !page.routeButton
+        ) {
+          page.routeButton = {
+            label: "Continue",
+            routeTo:
+              index + 1 < pages.length
+                ? pages[index + 1].id || `page-${index + 2}`
+                : `page-end`,
+          };
+        }
+
+        // For single-choice pages, remove routeButton and ensure options have routeTo
+        if (page.inputType === "single-choice") {
+          delete page.routeButton;
+
+          if (page.options && Array.isArray(page.options)) {
+            page.options = page.options.map((option: any) => {
+              if (!option.routeTo) {
+                const nextPageIndex = index + 1;
+                if (nextPageIndex < pages.length) {
+                  option.routeTo =
+                    pages[nextPageIndex].id || `page-${nextPageIndex + 1}`;
+                } else {
+                  option.routeTo = `page-end`;
+                }
+              }
+
+              // Remove invalid fields from single-choice options
+              delete option.type;
+              delete option.required;
+
+              return option;
+            });
           }
         }
       }
 
-      // Fix routeButton issues for non-display pages
-      if (page.inputType === "multi-choice" || page.inputType === "mixed") {
-        if (page.routeButton && !page.routeButton.routeTo) {
-          // If routeButton exists but has no routeTo, try to infer next page
+      // Fix routeButton issues for pages that should have them
+      if (page.routeButton) {
+        if (!page.routeButton.routeTo) {
           const nextPageIndex = index + 1;
           if (nextPageIndex < pages.length) {
             page.routeButton.routeTo =
               pages[nextPageIndex].id || `page-${nextPageIndex + 1}`;
           } else {
-            // Last page, remove routeButton
             delete page.routeButton;
           }
         }
 
-        // Ensure routeButton has label
         if (page.routeButton && !page.routeButton.label) {
           page.routeButton.label = "Continue";
-        }
-      }
-
-      // For single-choice pages, remove routeButton and ensure options have routeTo
-      if (page.inputType === "single-choice") {
-        delete page.routeButton;
-
-        // Ensure all options have routeTo
-        if (page.options && Array.isArray(page.options)) {
-          page.options = page.options.map((option: any, optIndex: number) => {
-            if (!option.routeTo) {
-              const nextPageIndex = index + 1;
-              if (nextPageIndex < pages.length) {
-                option.routeTo =
-                  pages[nextPageIndex].id || `page-${nextPageIndex + 1}`;
-              } else {
-                option.routeTo = `page-end`;
-              }
-            }
-
-            // Remove type field from single-choice options (not needed)
-            delete option.type;
-            delete option.required;
-
-            return option;
-          });
         }
       }
 
@@ -612,13 +599,13 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
       if (page.options && Array.isArray(page.options)) {
         page.options = page.options.map((option: any, optIndex: number) => {
           if (!option.id) {
-            option.id = `opt-${index}-${optIndex}`;
+            option.id = `opt-${index}-${optIndex + 1}`;
           }
           if (!option.label) {
             option.label = `Option ${optIndex + 1}`;
           }
-          if (!option.value) {
-            option.value = `value-${optIndex}`;
+          if (option.value === undefined || option.value === null) {
+            option.value = `value-${optIndex + 1}`;
           }
           return option;
         });
