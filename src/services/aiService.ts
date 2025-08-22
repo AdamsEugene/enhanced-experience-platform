@@ -136,128 +136,91 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-Generate a comprehensive, professional-grade auto insurance claim form based on: "${userIntent}"
+Generate a comprehensive, professional-grade decision tree form based on this user request: "${userIntent}"
 ${context ? `Additional context: ${context}` : ""}
 
-This must be a COMPLETE, DETAILED form with 20-25+ pages covering ALL scenarios like a real insurance company would use.
+Analyze the user's intent and create a detailed, multi-step form that helps them accomplish their goal through guided questions and information gathering.
 
-You MUST create comprehensive decision trees covering:
+For their request "${userIntent}", think about:
+- What specific information is needed to help them?
+- What decisions do they need to make?
+- What different scenarios or paths might they encounter?
+- What would a professional service provider ask them?
 
-1. INCIDENT CLASSIFICATION (4-5 pages):
-   - Primary incident type (collision, theft, weather, vandalism)
-   - Collision sub-types (vehicle-to-vehicle, object collision, rollover, animal)
-   - Fault determination (other driver, my fault, shared fault, unclear)
-   - Evidence documentation (police reports, witnesses, photos)
+Create a comprehensive form with 15-25+ pages covering ALL possible scenarios and paths for their specific need.
 
-2. INJURY ASSESSMENT (3-4 pages):
-   - Injury occurrence and severity
-   - Medical treatment details
-   - Ongoing care requirements
-   - Emergency response details
+EXAMPLES OF FORM TYPES TO CREATE:
 
-3. DAMAGE EVALUATION (4-5 pages):
-   - Damage severity assessment
-   - Drivability status
-   - Towing and storage needs
-   - Total loss evaluation
-   - Repair preferences
+If about INSURANCE CLAIMS → Create comprehensive claim filing process
+If about LOST ITEMS → Create systematic search and reporting process  
+If about TECHNICAL SUPPORT → Create detailed troubleshooting and diagnosis
+If about MEDICAL CONCERNS → Create symptom assessment and care guidance
+If about LEGAL ISSUES → Create case information gathering and guidance
+If about FINANCIAL SERVICES → Create application and verification process
+If about PRODUCT RETURNS → Create return reason and process guidance
+If about SERVICE REQUESTS → Create detailed needs assessment
+If about ACCOUNT ISSUES → Create problem diagnosis and resolution
+If about BOOKING/RESERVATIONS → Create preference and requirements gathering
 
-4. DETAILED INFORMATION GATHERING (6-8 pages):
-   - Complete accident details (date, time, location, description)
-   - Your vehicle information (year, make, model, VIN, license plate)
-   - Other driver and vehicle information
-   - Insurance and repair preferences
-   - Contact information and communication preferences
-
-5. REVIEW AND SUBMISSION (2-3 pages):
-   - Information review and confirmation
-   - Legal acknowledgments and authorizations
-   - Final submission and claim number
-
-Create JSON with this exact structure:
+JSON Structure:
 {
-  "name": "Comprehensive Auto Insurance Claim Assistant",
-  "description": "Complete professional-grade form for filing auto insurance claims with detailed information gathering",
+  "name": "Professional Form Title Relevant to User's Request",
+  "description": "Comprehensive description of what this form accomplishes for the user",
   "pages": [
     {
       "id": "page-1",
-      "title": "What type of incident are you reporting?",
-      "inputType": "single-choice",
+      "title": "Clear question or instruction relevant to their request",
+      "inputType": "single-choice|multi-choice|mixed|display-only",
       "options": [
         {
-          "id": "incident-collision",
-          "label": "Vehicle collision or accident",
-          "value": "collision",
-          "routeTo": "page-2"
-        },
-        {
-          "id": "incident-theft",
-          "label": "Theft or break-in", 
-          "value": "theft",
-          "routeTo": "page-theft-1"
-        },
-        {
-          "id": "incident-weather",
-          "label": "Weather damage (hail, flood, wind, etc.)",
-          "value": "weather",
-          "routeTo": "page-weather-1"
-        },
-        {
-          "id": "incident-vandalism",
-          "label": "Vandalism or malicious damage",
-          "value": "vandalism",
-          "routeTo": "page-vandalism-1"
+          "id": "option-id",
+          "label": "Option relevant to their situation",
+          "value": "option-value",
+          "type": "toggle|text|select",
+          "routeTo": "next-page-id",
+          "required": true
         }
-      ]
+      ],
+      "routeButton": {
+        "label": "Continue",
+        "routeTo": "next-page-id"
+      }
     }
   ]
 }
 
-CRITICAL JSON RULES:
-- Every "single-choice" page: options have "routeTo", NO routeButton
-- Every "multi-choice" page: options have NO routeTo, page has routeButton
-- Every "mixed" page: text/toggle options, page has routeButton  
-- Every "display-only" page: no options, no routeButton
-- ALL routeTo values must reference actual page IDs in your form
-- NO trailing commas, ALL braces properly closed
-- Every routeButton must have "label" and "routeTo"
+INPUT TYPE RULES:
+- "single-choice": User picks ONE option, each option has routeTo (no routeButton)
+- "multi-choice": User selects MULTIPLE options, page has routeButton
+- "mixed": Text inputs + toggles, page has routeButton
+- "display-only": Information display only
 
-REQUIRED PAGES (create ALL of these):
-- page-1: Primary incident type (single-choice → 4 paths)
-- page-2: Collision sub-type (single-choice → 4 paths)  
-- page-3: Fault determination (single-choice → 4 paths)
-- page-4: Evidence gathering (multi-choice)
-- page-5: Injury assessment (single-choice → 3 paths)
-- page-6: Vehicle damage level (single-choice → 4 paths)
-- page-7: Repair planning (multi-choice)
-- page-8: Accident details (mixed - date, time, location, description)
-- page-9: Your vehicle info (mixed - year, make, model, VIN, plate)
-- page-10: Other driver info (mixed - name, phone, insurance, vehicle)
-- page-11: Repair preferences (multi-choice)
-- page-12: Contact information (mixed)
-- page-13: Review and acknowledgments (multi-choice)
-- page-14: Final confirmation (display-only)
-- page-theft-1: Theft details (mixed)
-- page-theft-2: Additional theft info (mixed)
-- page-weather-1: Weather damage type (single-choice)
-- page-weather-2: Weather damage details (mixed)
-- page-injury-details-1: Minor injury info (mixed)
-- page-injury-details-2: Serious injury info (mixed)
-- page-towing-1: Towing arrangements (multi-choice)
-- page-towing-2: Storage details (mixed)
-- Plus additional specialized pages for different scenarios
+COMPREHENSIVE FORM REQUIREMENTS:
+1. Start with broad categorization relevant to their request
+2. Progressive information gathering with logical flow
+3. Multiple decision branches for different scenarios
+4. Detailed data collection for their specific need
+5. Professional, helpful language throughout
+6. End with actionable next steps or completion
 
-Include branches for:
-- Object collisions, animal collisions, rollovers
-- At-fault vs not-at-fault scenarios
-- Minor vs major vs total loss damage
-- Injury vs no-injury paths
-- Towing and storage needs
-- Weather damage subtypes
+For "${userIntent}", create 15-25+ pages with:
+- Initial classification and scenario identification
+- Specific details gathering relevant to their situation  
+- Multiple paths for different circumstances they might face
+- Comprehensive information collection
+- Clear next steps and resolution
 
-Create MINIMUM 20+ pages with comprehensive coverage of all insurance claim scenarios.
+CRITICAL JSON REQUIREMENTS:
+- ALL routeTo values must reference actual page IDs in the form
+- NO trailing commas anywhere
+- Every routeButton must have both "label" and "routeTo"
+- All JSON objects must be properly closed
+- Single-choice pages: options have routeTo, no routeButton
+- Multi-choice/mixed pages: page has routeButton, options don't have routeTo
 
-RESPOND ONLY WITH COMPLETE, VALID JSON. Every routeTo must reference a real page in your form.`;
+Create a thorough, professional form with MINIMUM 15-20 pages that truly helps the user with their specific request: "${userIntent}"
+
+RESPOND ONLY WITH COMPLETE, VALID JSON.`;
   }
 
   private buildSubmissionAnalysisPrompt(
