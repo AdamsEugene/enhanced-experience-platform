@@ -136,74 +136,128 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-You must create a comprehensive auto insurance claim form. This is critical - respond ONLY with valid, complete JSON.
+Generate a comprehensive, professional-grade auto insurance claim form based on: "${userIntent}"
+${context ? `Additional context: ${context}` : ""}
 
-User request: "${userIntent}"
-${context ? `Context: ${context}` : ""}
+This must be a COMPLETE, DETAILED form with 20-25+ pages covering ALL scenarios like a real insurance company would use.
 
-Generate exactly this JSON structure with 10-15 pages:
+You MUST create comprehensive decision trees covering:
 
+1. INCIDENT CLASSIFICATION (4-5 pages):
+   - Primary incident type (collision, theft, weather, vandalism)
+   - Collision sub-types (vehicle-to-vehicle, object collision, rollover, animal)
+   - Fault determination (other driver, my fault, shared fault, unclear)
+   - Evidence documentation (police reports, witnesses, photos)
+
+2. INJURY ASSESSMENT (3-4 pages):
+   - Injury occurrence and severity
+   - Medical treatment details
+   - Ongoing care requirements
+   - Emergency response details
+
+3. DAMAGE EVALUATION (4-5 pages):
+   - Damage severity assessment
+   - Drivability status
+   - Towing and storage needs
+   - Total loss evaluation
+   - Repair preferences
+
+4. DETAILED INFORMATION GATHERING (6-8 pages):
+   - Complete accident details (date, time, location, description)
+   - Your vehicle information (year, make, model, VIN, license plate)
+   - Other driver and vehicle information
+   - Insurance and repair preferences
+   - Contact information and communication preferences
+
+5. REVIEW AND SUBMISSION (2-3 pages):
+   - Information review and confirmation
+   - Legal acknowledgments and authorizations
+   - Final submission and claim number
+
+Create JSON with this exact structure:
 {
-  "name": "Comprehensive Auto Insurance Claim Form",
-  "description": "Complete form for filing auto insurance claims",
+  "name": "Comprehensive Auto Insurance Claim Assistant",
+  "description": "Complete professional-grade form for filing auto insurance claims with detailed information gathering",
   "pages": [
     {
       "id": "page-1",
-      "title": "What type of incident occurred?",
+      "title": "What type of incident are you reporting?",
       "inputType": "single-choice",
       "options": [
         {
           "id": "incident-collision",
-          "label": "Vehicle collision",
+          "label": "Vehicle collision or accident",
           "value": "collision",
           "routeTo": "page-2"
         },
         {
-          "id": "incident-theft", 
-          "label": "Theft or vandalism",
+          "id": "incident-theft",
+          "label": "Theft or break-in", 
           "value": "theft",
-          "routeTo": "page-3"
+          "routeTo": "page-theft-1"
         },
         {
           "id": "incident-weather",
-          "label": "Weather damage",
-          "value": "weather", 
-          "routeTo": "page-4"
+          "label": "Weather damage (hail, flood, wind, etc.)",
+          "value": "weather",
+          "routeTo": "page-weather-1"
+        },
+        {
+          "id": "incident-vandalism",
+          "label": "Vandalism or malicious damage",
+          "value": "vandalism",
+          "routeTo": "page-vandalism-1"
         }
       ]
     }
   ]
 }
 
-REQUIREMENTS:
-1. Create 10-15 pages minimum
-2. Include these page types:
-   - Incident classification (single-choice)
-   - Fault determination (single-choice) 
-   - Evidence gathering (multi-choice)
-   - Damage assessment (single-choice)
-   - Personal details (mixed)
-   - Vehicle information (mixed)
-   - Contact information (mixed)
-   - Review and confirmation (display-only)
+CRITICAL JSON RULES:
+- Every "single-choice" page: options have "routeTo", NO routeButton
+- Every "multi-choice" page: options have NO routeTo, page has routeButton
+- Every "mixed" page: text/toggle options, page has routeButton  
+- Every "display-only" page: no options, no routeButton
+- ALL routeTo values must reference actual page IDs in your form
+- NO trailing commas, ALL braces properly closed
+- Every routeButton must have "label" and "routeTo"
 
-3. Every single-choice option MUST have routeTo
-4. Every multi-choice and mixed page MUST have routeButton with label and routeTo
-5. All routeTo values must reference actual page IDs in your form
-6. NO trailing commas anywhere
-7. ALL JSON objects must be complete and properly closed
+REQUIRED PAGES (create ALL of these):
+- page-1: Primary incident type (single-choice → 4 paths)
+- page-2: Collision sub-type (single-choice → 4 paths)  
+- page-3: Fault determination (single-choice → 4 paths)
+- page-4: Evidence gathering (multi-choice)
+- page-5: Injury assessment (single-choice → 3 paths)
+- page-6: Vehicle damage level (single-choice → 4 paths)
+- page-7: Repair planning (multi-choice)
+- page-8: Accident details (mixed - date, time, location, description)
+- page-9: Your vehicle info (mixed - year, make, model, VIN, plate)
+- page-10: Other driver info (mixed - name, phone, insurance, vehicle)
+- page-11: Repair preferences (multi-choice)
+- page-12: Contact information (mixed)
+- page-13: Review and acknowledgments (multi-choice)
+- page-14: Final confirmation (display-only)
+- page-theft-1: Theft details (mixed)
+- page-theft-2: Additional theft info (mixed)
+- page-weather-1: Weather damage type (single-choice)
+- page-weather-2: Weather damage details (mixed)
+- page-injury-details-1: Minor injury info (mixed)
+- page-injury-details-2: Serious injury info (mixed)
+- page-towing-1: Towing arrangements (multi-choice)
+- page-towing-2: Storage details (mixed)
+- Plus additional specialized pages for different scenarios
 
-Example patterns:
-- single-choice: options have routeTo, no routeButton
-- multi-choice: options have no routeTo, page has routeButton
-- mixed: text inputs and toggles, page has routeButton
-- display-only: just info, no routeButton
+Include branches for:
+- Object collisions, animal collisions, rollovers
+- At-fault vs not-at-fault scenarios
+- Minor vs major vs total loss damage
+- Injury vs no-injury paths
+- Towing and storage needs
+- Weather damage subtypes
 
-Build paths for: collision details → fault → evidence → damage → vehicle info → contact → submit
+Create MINIMUM 20+ pages with comprehensive coverage of all insurance claim scenarios.
 
-CRITICAL: Double-check every brace, bracket, comma, and quote. Ensure all objects are complete.
-
-Respond with ONLY the JSON. No explanations, no markdown, no extra text.`;
+RESPOND ONLY WITH COMPLETE, VALID JSON. Every routeTo must reference a real page in your form.`;
   }
 
   private buildSubmissionAnalysisPrompt(
