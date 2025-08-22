@@ -20,53 +20,75 @@ export class OpenAIService implements AIService {
     userIntent: string,
     context?: string
   ): Promise<FormDefinition> {
-    try {
-      const prompt = this.buildFormGenerationPrompt(userIntent, context);
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
 
-      console.log("Making OpenAI API request...");
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`Form generation attempt ${attempt}/${maxAttempts}`);
 
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert at creating comprehensive, detailed forms and decision trees. You create thorough, professional-grade forms that cover all possible scenarios and gather complete information. You always respond with valid JSON only, no explanations or markdown.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 4095,
-        temperature: 0.1,
-      });
+        const prompt = this.buildFormGenerationPrompt(userIntent, context);
 
-      console.log("OpenAI API response received");
+        const response = await this.openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert at creating comprehensive, detailed forms and decision trees. You create thorough, professional-grade forms that cover all possible scenarios and gather complete information. You MUST respond with valid, complete JSON only. Every JSON object must be properly closed. Every routeButton must have both label and routeTo fields.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 4095,
+          temperature: 0.05, // Lower temperature for more consistent output
+        });
 
-      const content = response.choices[0].message.content;
-      if (!content) {
-        throw new Error("No content received from OpenAI");
+        const content = response.choices[0].message.content;
+        if (!content) {
+          throw new Error("No content received from OpenAI");
+        }
+
+        console.log(`Response received, length: ${content.length}`);
+
+        // Log first and last 200 characters for debugging
+        console.log("Response start:", content.substring(0, 200));
+        console.log("Response end:", content.substring(content.length - 200));
+
+        const formJson = this.extractJSONFromResponse(content);
+
+        const result = {
+          ...formJson,
+          id: this.generateFormId(),
+          createdAt: new Date().toISOString(),
+          generatedFrom: userIntent,
+        };
+
+        console.log(`✅ Form generated successfully on attempt ${attempt}`);
+        console.log(`Generated ${result.pages?.length || 0} pages`);
+
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`❌ Attempt ${attempt} failed:`, error);
+
+        if (attempt === maxAttempts) {
+          console.error("All attempts failed, throwing error");
+          break;
+        }
+
+        // Wait a bit before retrying
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       }
-
-      console.log("Response content length:", content.length);
-
-      const formJson = this.extractJSONFromResponse(content);
-
-      return {
-        ...formJson,
-        id: this.generateFormId(),
-        createdAt: new Date().toISOString(),
-        generatedFrom: userIntent,
-      };
-    } catch (error) {
-      console.error("Error generating form:", error);
-      throw new Error(
-        `Failed to generate form: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
     }
+
+    throw new Error(
+      `Failed to generate form after ${maxAttempts} attempts. Last error: ${
+        lastError?.message || "Unknown error"
+      }`
+    );
   }
 
   async processFormSubmission(
@@ -114,100 +136,74 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-Generate a comprehensive, detailed decision tree form based on this user request: "${userIntent}"
-${context ? `Additional context: ${context}` : ""}
+You must create a comprehensive auto insurance claim form. This is critical - respond ONLY with valid, complete JSON.
 
-This should be a PROFESSIONAL-GRADE, COMPREHENSIVE form that covers ALL possible scenarios and gathers COMPLETE information. Think like a real insurance company or professional service provider.
+User request: "${userIntent}"
+${context ? `Context: ${context}` : ""}
 
-Create a JSON form definition with 15-25+ pages that breaks down the user's request into multiple logical steps/slides. Each slide should gather specific information needed to complete their task comprehensively.
+Generate exactly this JSON structure with 10-15 pages:
 
-CRITICAL JSON REQUIREMENTS:
-- Every routeButton MUST have both "label" and "routeTo" fields
-- Every option MUST have "id", "label", and "value" fields
-- All JSON must be properly closed with matching braces and brackets
-- No trailing commas
-- No incomplete objects
-
-Follow this exact structure:
 {
-  "name": "Professional Form Title",
-  "description": "Comprehensive description of what this form accomplishes",
+  "name": "Comprehensive Auto Insurance Claim Form",
+  "description": "Complete form for filing auto insurance claims",
   "pages": [
     {
       "id": "page-1",
-      "title": "Clear question or instruction for the user",
-      "inputType": "single-choice|multi-choice|mixed|display-only",
+      "title": "What type of incident occurred?",
+      "inputType": "single-choice",
       "options": [
         {
-          "id": "option-id",
-          "label": "Button or field label",
-          "value": "option-value",
-          "type": "toggle|text|select",
-          "routeTo": "next-page-id",
-          "required": true
+          "id": "incident-collision",
+          "label": "Vehicle collision",
+          "value": "collision",
+          "routeTo": "page-2"
+        },
+        {
+          "id": "incident-theft", 
+          "label": "Theft or vandalism",
+          "value": "theft",
+          "routeTo": "page-3"
+        },
+        {
+          "id": "incident-weather",
+          "label": "Weather damage",
+          "value": "weather", 
+          "routeTo": "page-4"
         }
-      ],
-      "routeButton": {
-        "label": "Continue",
-        "routeTo": "next-page-id"
-      }
+      ]
     }
   ]
 }
 
-Input Type Rules:
-- "single-choice": User picks ONE option, each option MUST have routeTo (no routeButton needed)
-- "multi-choice": User can select MULTIPLE options, MUST have routeButton with valid routeTo
-- "mixed": Combination of text inputs and toggles, MUST have routeButton with valid routeTo
-- "display-only": Information display, no routeButton needed
+REQUIREMENTS:
+1. Create 10-15 pages minimum
+2. Include these page types:
+   - Incident classification (single-choice)
+   - Fault determination (single-choice) 
+   - Evidence gathering (multi-choice)
+   - Damage assessment (single-choice)
+   - Personal details (mixed)
+   - Vehicle information (mixed)
+   - Contact information (mixed)
+   - Review and confirmation (display-only)
 
-JSON VALIDATION RULES:
-1. Every page MUST have: id, title, inputType, options array
-2. Every routeButton MUST have: label, routeTo
-3. Every routeTo MUST reference a valid page id that exists in the form
-4. All objects must be properly closed
-5. No trailing commas anywhere
+3. Every single-choice option MUST have routeTo
+4. Every multi-choice and mixed page MUST have routeButton with label and routeTo
+5. All routeTo values must reference actual page IDs in your form
+6. NO trailing commas anywhere
+7. ALL JSON objects must be complete and properly closed
 
-COMPREHENSIVE Form Requirements:
-1. Start with broad categorization (incident type, severity, etc.)
-2. Branch into specific scenarios with detailed paths
-3. Gather ALL relevant details for each scenario:
-   - Incident details (date, time, location, description)
-   - Parties involved (names, contact info, insurance details)
-   - Damage assessment (detailed descriptions, photos, estimates)
-   - Evidence gathering (police reports, witnesses, documentation)
-   - Injury information (if applicable)
-   - Vehicle information (make, model, year, VIN, license plates)
-   - Insurance preferences (repair shops, rental cars, claim handling)
-   - Contact information and communication preferences
-   - Legal acknowledgments and authorizations
-4. Include multiple decision branches for different scenarios
-5. End with comprehensive review and confirmation pages
-6. Use professional, clear language throughout
+Example patterns:
+- single-choice: options have routeTo, no routeButton
+- multi-choice: options have no routeTo, page has routeButton
+- mixed: text inputs and toggles, page has routeButton
+- display-only: just info, no routeButton
 
-For auto insurance specifically, include paths for:
-- Vehicle-to-vehicle collisions (fault determination, other driver info)
-- Single-vehicle accidents (object strikes, rollovers)
-- Theft and break-ins (police reports, stolen items)
-- Weather damage (hail, flood, wind, lightning)
-- Vandalism and malicious damage
-- Animal collisions
-- Comprehensive damage assessment flows
-- Injury documentation procedures
-- Towing and storage arrangements
-- Total loss procedures
+Build paths for: collision details → fault → evidence → damage → vehicle info → contact → submit
 
-Create AT LEAST 15-20 pages with multiple branching paths. Be thorough and professional.
+CRITICAL: Double-check every brace, bracket, comma, and quote. Ensure all objects are complete.
 
-BEFORE RESPONDING: Double-check that:
-- Every routeButton has both label and routeTo
-- Every routeTo points to an actual page id in your form
-- All JSON brackets and braces are properly matched
-- No trailing commas exist
-- All required fields are present
-
-RESPOND ONLY WITH VALID, COMPLETE JSON. NO EXPLANATIONS OR MARKDOWN BLOCKS.
-    `;
+Respond with ONLY the JSON. No explanations, no markdown, no extra text.`;
   }
 
   private buildSubmissionAnalysisPrompt(
@@ -241,35 +237,174 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
   }
 
   private extractJSONFromResponse(response: string): any {
+    console.log("🔍 Starting JSON extraction...");
+
     try {
-      // Remove markdown code blocks if present
+      // Step 1: Clean the response
       let cleaned = response
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
+        .replace(/^\s*[\r\n]/gm, "") // Remove empty lines
         .trim();
 
-      // Find the first { and last } to extract just the JSON
+      console.log("Cleaned response length:", cleaned.length);
+
+      // Step 2: Find JSON boundaries
       const firstBrace = cleaned.indexOf("{");
       const lastBrace = cleaned.lastIndexOf("}");
 
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      if (firstBrace === -1 || lastBrace === -1) {
+        throw new Error("No JSON object found in response");
       }
 
-      // Try to parse and validate
-      const parsed = JSON.parse(cleaned);
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      console.log("Extracted JSON length:", cleaned.length);
 
-      // Validate and fix the structure
+      // Step 3: Try to fix common JSON issues
+      cleaned = this.fixCommonJSONIssues(cleaned);
+
+      // Step 4: Parse JSON
+      const parsed = JSON.parse(cleaned);
+      console.log("✅ JSON parsed successfully");
+
+      // Step 5: Validate and fix structure
       if (parsed.pages) {
+        console.log(`Validating ${parsed.pages.length} pages...`);
         parsed.pages = this.validateAndFixPages(parsed.pages);
+        console.log("✅ Pages validated and fixed");
+      } else {
+        throw new Error("No pages found in parsed JSON");
       }
 
       return parsed;
     } catch (error) {
-      console.error("Failed to parse JSON from OpenAI response:", response);
-      // console.error("Cleaned response:", cleaned);
+      console.error("❌ JSON extraction failed:", error);
+      console.error(
+        "Raw response (first 500 chars):",
+        response.substring(0, 500)
+      );
+      console.error(
+        "Raw response (last 500 chars):",
+        response.substring(response.length - 500)
+      );
+
+      // Try to save what we can
+      if (error instanceof SyntaxError) {
+        console.log("🔧 Attempting to fix JSON syntax error...");
+        try {
+          const fixed = this.attemptJSONRepair(response);
+          if (fixed) {
+            console.log("✅ JSON repair successful");
+            return fixed;
+          }
+        } catch (repairError) {
+          console.error("❌ JSON repair also failed:", repairError);
+        }
+      }
+
       throw new Error("Invalid JSON response from AI service");
     }
+  }
+
+  private fixCommonJSONIssues(jsonString: string): string {
+    console.log("🔧 Fixing common JSON issues...");
+
+    // Fix trailing commas
+    let fixed = jsonString
+      .replace(/,\s*}/g, "}") // Remove trailing commas before }
+      .replace(/,\s*]/g, "]"); // Remove trailing commas before ]
+
+    // Fix incomplete routeButton objects
+    fixed = fixed.replace(
+      /"routeButton":\s*{\s*"label":\s*"[^"]*",?\s*}/g,
+      (match) => {
+        if (!match.includes('"routeTo"')) {
+          return match.replace("}", ', "routeTo": "page-end"}');
+        }
+        return match;
+      }
+    );
+
+    // Fix missing quotes around property names
+    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+
+    return fixed;
+  }
+
+  private attemptJSONRepair(response: string): any | null {
+    console.log("🚨 Attempting emergency JSON repair...");
+
+    try {
+      // Extract just the pages array if possible
+      const pagesMatch = response.match(/"pages":\s*\[(.*?)\]/s);
+      if (pagesMatch) {
+        console.log("Found pages array, attempting minimal form creation...");
+
+        // Create a minimal valid form structure
+        const minimalForm = {
+          name: "Auto Insurance Claim Form",
+          description: "Generated form for insurance claim",
+          pages: [
+            {
+              id: "page-1",
+              title: "What type of incident are you reporting?",
+              inputType: "single-choice",
+              options: [
+                {
+                  id: "opt-1",
+                  label: "Vehicle accident",
+                  value: "accident",
+                  routeTo: "page-2",
+                },
+                {
+                  id: "opt-2",
+                  label: "Other incident",
+                  value: "other",
+                  routeTo: "page-2",
+                },
+              ],
+            },
+            {
+              id: "page-2",
+              title: "Please provide details about the incident",
+              inputType: "mixed",
+              options: [
+                {
+                  id: "opt-3",
+                  type: "text",
+                  label: "Describe what happened",
+                  value: "",
+                  required: true,
+                },
+              ],
+              routeButton: {
+                label: "Submit",
+                routeTo: "page-3",
+              },
+            },
+            {
+              id: "page-3",
+              title: "Your claim has been submitted",
+              inputType: "display-only",
+              options: [
+                {
+                  id: "info-1",
+                  type: "display",
+                  label: "Thank you for submitting your claim",
+                  value: "submitted",
+                },
+              ],
+            },
+          ],
+        };
+
+        return minimalForm;
+      }
+    } catch (repairError) {
+      console.error("Emergency repair failed:", repairError);
+    }
+
+    return null;
   }
 
   private validateAndFixPages(pages: any[]): any[] {
