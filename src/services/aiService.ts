@@ -57,7 +57,7 @@ export class OpenAIService implements AIService {
         console.log("Response start:", content.substring(0, 200));
         console.log("Response end:", content.substring(content.length - 200));
 
-        const formJson = this.extractJSONFromResponse(content);
+        const formJson = this.extractJSONFromResponse(content, userIntent);
 
         const result = {
           ...formJson,
@@ -120,7 +120,7 @@ export class OpenAIService implements AIService {
         throw new Error("No content received from OpenAI");
       }
 
-      return this.extractJSONFromResponse(content);
+      return this.extractJSONFromResponse(content, "form submission analysis");
     } catch (error) {
       console.error("Error processing form submission:", error);
       throw new Error(
@@ -136,137 +136,60 @@ export class OpenAIService implements AIService {
     context?: string
   ): string {
     return `
-Generate a COMPREHENSIVE, DETAILED decision tree form based on: "${userIntent}"
+Create a decision tree form for: "${userIntent}"
 ${context ? `Additional context: ${context}` : ""}
 
-You must create a PROFESSIONAL-GRADE form with 20-30+ pages that covers ALL possible scenarios and branches, similar to what a real service company would use.
+Generate a form that helps users with this specific request. The form should be relevant, practical, and directly address their needs.
 
-COMPREHENSIVE COVERAGE REQUIRED:
-Create extensive decision trees with multiple branches covering every possible scenario the user might encounter. Think like a professional service provider who needs complete information.
+STRUCTURE RULES:
 
-For "${userIntent}", create detailed flows covering:
-- Initial categorization with 3-4+ major branches
-- Each branch should have 5-10+ sub-pages for detailed information gathering
-- Multiple decision points within each branch
-- Comprehensive data collection at each step
-- Professional follow-up questions and clarifications
-- Final resolution with detailed next steps
+1. "single-choice" pages: Options have routeTo field, no routeButton
+2. "multi-choice" pages: Options without routeTo, page has routeButton
+3. "mixed" pages: Mix of text inputs and options, page has routeButton  
+4. "display-only" pages: No options array, optional routeButton
 
-MANDATORY STRUCTURE RULES:
+Create 5-10 pages that logically flow based on the user's intent.
 
-1. "single-choice" pages:
-   - Must have 2-4 options in the options array
-   - Each option MUST have routeTo field pointing to different pages
-   - NO routeButton on these pages
-   - Options only need: id, label, value, routeTo
+For "${userIntent}", create a form that:
+- Starts with relevant categorization
+- Gathers necessary information
+- Provides helpful guidance
+- Ends with actionable next steps
 
-2. "multi-choice" pages:
-   - Must have 3-6 options in the options array
-   - Options do NOT have routeTo (just id, label, value)
-   - Page MUST have routeButton with label and routeTo
-
-3. "mixed" pages:
-   - Must have 2-6 options combining text inputs and toggles
-   - Text inputs: type:"text", required:true/false, value:""
-   - Toggles: type:"toggle", value:"toggle-name"
-   - Page MUST have routeButton
-
-4. "display-only" pages:
-   - NO options field at all (completely remove it)
-   - Optional routeButton only if continuing to another page
-   - Used for final confirmation, results, or information display
-
-JSON Structure (create 20-30+ pages like this):
+JSON Example:
 {
-  "name": "Comprehensive [Service Type] Assistant",
-  "description": "Complete professional-grade form covering all aspects of [user's need]",
+  "name": "[Relevant Form Name]",
+  "description": "[Form description matching user intent]",
   "pages": [
     {
       "id": "page-1",
-      "title": "What specific type of [user's need] situation are you dealing with?",
+      "title": "[Question relevant to user intent]",
       "inputType": "single-choice",
       "options": [
         {
-          "id": "primary-type-1",
-          "label": "Major category 1 relevant to request",
-          "value": "category-1",
+          "id": "opt-1",
+          "label": "[Option relevant to intent]",
+          "value": "value1",
           "routeTo": "page-2"
         },
         {
-          "id": "primary-type-2",
-          "label": "Major category 2 relevant to request", 
-          "value": "category-2",
-          "routeTo": "page-branch-2"
-        },
-        {
-          "id": "primary-type-3",
-          "label": "Major category 3 relevant to request",
-          "value": "category-3", 
-          "routeTo": "page-branch-3"
-        },
-        {
-          "id": "primary-type-4",
-          "label": "Other or complex situation",
-          "value": "complex",
-          "routeTo": "page-complex-1"
-        }
-      ]
-    },
-    {
-      "id": "page-2",
-      "title": "For [category 1], what specific sub-type applies to your situation?",
-      "inputType": "single-choice",
-      "options": [
-        {
-          "id": "sub-type-1a",
-          "label": "Specific scenario A",
-          "value": "scenario-a",
+          "id": "opt-2", 
+          "label": "[Second relevant option]",
+          "value": "value2",
           "routeTo": "page-3"
-        },
-        {
-          "id": "sub-type-1b", 
-          "label": "Specific scenario B",
-          "value": "scenario-b",
-          "routeTo": "page-4"
-        },
-        {
-          "id": "sub-type-1c",
-          "label": "Specific scenario C",
-          "value": "scenario-c",
-          "routeTo": "page-5"
         }
       ]
     }
   ]
 }
 
-COMPREHENSIVE REQUIREMENTS:
-1. Create MINIMUM 20-30 pages with deep branching
-2. Each major category should have 5-8 detailed pages
-3. Include extensive information gathering pages (mixed type)
-4. Multiple decision points and scenario branches
-5. Professional, detailed questions throughout
-6. End with comprehensive summary/confirmation pages
+IMPORTANT: 
+- Make the form DIRECTLY relevant to "${userIntent}"
+- Use practical, helpful questions
+- Create logical flow between pages
+- Ensure all routeTo values reference actual page IDs
 
-For "${userIntent}" specifically:
-- Start with broad categorization (3-4 major paths)
-- Each path should drill down into specific scenarios
-- Gather comprehensive details at each step
-- Include edge cases and complex situations
-- Professional language and thorough coverage
-- Multiple routes converging to final steps
-
-VALIDATION REQUIREMENTS:
-✓ 20-30+ pages minimum
-✓ Multiple branches from main categories
-✓ No empty options arrays (except display-only has none)
-✓ All routeTo values reference actual page IDs
-✓ Comprehensive coverage of all scenarios
-✓ Professional, detailed approach throughout
-
-Create a thorough, extensive form that covers every aspect of "${userIntent}" like a professional service would.
-
-RESPOND ONLY WITH COMPLETE, VALID JSON.`;
+RESPOND ONLY WITH VALID JSON.`;
   }
 
   private buildSubmissionAnalysisPrompt(
@@ -299,7 +222,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
     `;
   }
 
-  private extractJSONFromResponse(response: string): any {
+  private extractJSONFromResponse(response: string, userIntent: string): any {
     console.log("🔍 Starting JSON extraction...");
 
     try {
@@ -355,7 +278,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
       if (error instanceof SyntaxError) {
         console.log("🔧 Attempting to fix JSON syntax error...");
         try {
-          const fixed = this.attemptJSONRepair(response);
+          const fixed = this.attemptJSONRepair(response, userIntent);
           if (fixed) {
             console.log("✅ JSON repair successful");
             return fixed;
@@ -394,7 +317,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
     return fixed;
   }
 
-  private attemptJSONRepair(response: string): any | null {
+  private attemptJSONRepair(response: string, userIntent: string): any | null {
     console.log("🚨 Attempting emergency JSON repair...");
 
     try {
@@ -403,71 +326,118 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
       if (pagesMatch) {
         console.log("Found pages array, attempting minimal form creation...");
 
-        // Create a minimal valid form structure
-        const minimalForm = {
-          name: "Auto Insurance Claim Form",
-          description: "Generated form for insurance claim",
-          pages: [
-            {
-              id: "page-1",
-              title: "What type of incident are you reporting?",
-              inputType: "single-choice",
-              options: [
-                {
-                  id: "opt-1",
-                  label: "Vehicle accident",
-                  value: "accident",
-                  routeTo: "page-2",
-                },
-                {
-                  id: "opt-2",
-                  label: "Other incident",
-                  value: "other",
-                  routeTo: "page-2",
-                },
-              ],
-            },
-            {
-              id: "page-2",
-              title: "Please provide details about the incident",
-              inputType: "mixed",
-              options: [
-                {
-                  id: "opt-3",
-                  type: "text",
-                  label: "Describe what happened",
-                  value: "",
-                  required: true,
-                },
-              ],
-              routeButton: {
-                label: "Submit",
-                routeTo: "page-3",
-              },
-            },
-            {
-              id: "page-3",
-              title: "Your claim has been submitted",
-              inputType: "display-only",
-              options: [
-                {
-                  id: "info-1",
-                  type: "display",
-                  label: "Thank you for submitting your claim",
-                  value: "submitted",
-                },
-              ],
-            },
-          ],
-        };
-
-        return minimalForm;
+        // Create a minimal valid form structure based on user intent
+        return this.createFallbackForm(userIntent);
       }
     } catch (repairError) {
       console.error("Emergency repair failed:", repairError);
     }
 
     return null;
+  }
+
+  private createFallbackForm(userIntent: string): any {
+    // Create a simple, relevant form based on the user's intent
+    const sanitizedIntent = userIntent.toLowerCase();
+
+    let formConfig = {
+      name: "Information Gathering",
+      description: "A form to help with your request",
+      pages: [
+        {
+          id: "page-1",
+          title: `Let's help you with: ${userIntent}`,
+          inputType: "single-choice",
+          options: [
+            {
+              id: "opt-1",
+              label: "I need more specific guidance",
+              value: "specific",
+              routeTo: "page-2",
+            },
+            {
+              id: "opt-2",
+              label: "I want general information",
+              value: "general",
+              routeTo: "page-3",
+            },
+          ],
+        },
+        {
+          id: "page-2",
+          title: "Tell us more about your specific needs",
+          inputType: "mixed",
+          options: [
+            {
+              id: "opt-details",
+              type: "text",
+              label: "Please describe what specifically you're looking for",
+              value: "",
+              required: true,
+            },
+          ],
+          routeButton: {
+            label: "Continue",
+            routeTo: "page-4",
+          },
+        },
+        {
+          id: "page-3",
+          title: "What type of information would be most helpful?",
+          inputType: "multi-choice",
+          options: [
+            {
+              id: "opt-overview",
+              label: "Overview and basics",
+              value: "overview",
+            },
+            {
+              id: "opt-steps",
+              label: "Step-by-step guidance",
+              value: "steps",
+            },
+            {
+              id: "opt-resources",
+              label: "Resources and tools",
+              value: "resources",
+            },
+          ],
+          routeButton: {
+            label: "Continue",
+            routeTo: "page-4",
+          },
+        },
+        {
+          id: "page-4",
+          title: "Thank you for your information",
+          inputType: "display-only",
+        },
+      ],
+    };
+
+    // Customize based on intent keywords
+    if (sanitizedIntent.includes("learn")) {
+      formConfig.name = "Learning Path Assistant";
+      formConfig.description =
+        "Help us create a personalized learning plan for you";
+      formConfig.pages[0].title = "What would you like to learn about?";
+      if (formConfig.pages[0].options && formConfig.pages[0].options[0]) {
+        formConfig.pages[0].options[0].label =
+          "I want a structured learning plan";
+      }
+      if (formConfig.pages[0].options && formConfig.pages[0].options[1]) {
+        formConfig.pages[0].options[1].label = "I need learning resources";
+      }
+    } else if (
+      sanitizedIntent.includes("plan") ||
+      sanitizedIntent.includes("schedule")
+    ) {
+      formConfig.name = "Planning Assistant";
+      formConfig.description = "Help us create a plan that works for you";
+      formConfig.pages[0].title = "What type of planning do you need?";
+    }
+
+    return formConfig;
   }
 
   private validateAndFixPages(pages: any[]): any[] {

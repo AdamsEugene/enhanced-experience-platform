@@ -217,7 +217,7 @@ app.use((req, res) => {
   res.status(404).json(error);
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3007;
 
 app.listen(PORT, () => {
   console.log(`🚀 Enhanced Experience Platform Server running on port ${PORT}`);
