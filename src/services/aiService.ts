@@ -46,7 +46,7 @@ export class OpenAIService implements AIService {
             {
               role: "system",
               content:
-                "You are an expert at creating comprehensive, detailed forms and decision trees. You create thorough, professional-grade forms that cover all possible scenarios and gather complete information. You MUST respond with valid, complete JSON only. Every JSON object must be properly closed. Every routeButton must have both label and routeTo fields.",
+                "You are an expert at creating comprehensive, detailed forms and decision trees. You create thorough, professional-grade forms that cover all possible scenarios and gather complete information. You MUST respond with valid, complete JSON only. Every JSON object must be properly closed. Every routeButton must have both label and routeTo fields. IMPORTANT: Always use page IDs in the format 'page-[descriptor]' (e.g., page-1, page-theft-1, page-injury-details-1) for frontend compatibility.",
             },
             {
               role: "user",
@@ -66,12 +66,20 @@ export class OpenAIService implements AIService {
 
         const formJson = this.extractJSONFromResponse(content, userIntent);
 
+        // Ensure the form has all required fields
         const result = {
-          ...formJson,
           id: this.generateFormId(),
+          name: formJson.name || this.generateFormName(userIntent),
+          description:
+            formJson.description || this.generateFormDescription(userIntent),
           createdAt: new Date().toISOString(),
           generatedFrom: userIntent,
+          pages: formJson.pages || [],
+          ...formJson, // Allow override but ensure required fields exist
         };
+
+        // Validate and fix page IDs to ensure they follow the page-[something] format
+        result.pages = this.ensurePageIdFormat(result.pages);
 
         console.log(`✅ Form generated successfully on attempt ${attempt}`);
         console.log(`Generated ${result.pages?.length || 0} pages`);
@@ -205,11 +213,16 @@ export class OpenAIService implements AIService {
       editRequest.newIntent || existingForm.generatedFrom || "form edit"
     );
 
-    return {
+    // Ensure edited form has all required fields and proper page ID format
+    const result = {
       ...existingForm,
-      ...formJson,
+      name: formJson.name || existingForm.name,
+      description: formJson.description || existingForm.description,
+      pages: this.ensurePageIdFormat(formJson.pages || existingForm.pages),
       generatedFrom: editRequest.newIntent || existingForm.generatedFrom,
     };
+
+    return result;
   }
 
   private async regenerateSpecificPages(
@@ -249,10 +262,15 @@ export class OpenAIService implements AIService {
       existingForm.generatedFrom || "form edit"
     );
 
-    return {
+    // Ensure edited form has all required fields and proper page ID format
+    const result = {
       ...existingForm,
-      ...formJson,
+      name: formJson.name || existingForm.name,
+      description: formJson.description || existingForm.description,
+      pages: this.ensurePageIdFormat(formJson.pages || existingForm.pages),
     };
+
+    return result;
   }
 
   private async modifyFormStructure(
@@ -416,6 +434,7 @@ export class OpenAIService implements AIService {
         }
         prompt += `- Maintain minimum ${editRequest.minPages || 20} pages\n`;
         prompt += `- Create comprehensive coverage with detailed branching\n`;
+        prompt += `- MUST use page-[descriptor] format for all page IDs\n`;
         break;
 
       case "specific_pages":
@@ -503,15 +522,17 @@ export class OpenAIService implements AIService {
     // Add common requirements
     prompt += `\n\nREQUIREMENTS:
 - Return the COMPLETE modified form as valid JSON
+- MUST include "name" and "description" fields at top level
 - Maintain consistency in page IDs and routing
-- Ensure all routeTo values reference valid page IDs
+- ALL page IDs MUST use format: page-[descriptor] (e.g., page-1, page-theft-1)
+- ALL routeTo values must reference valid page-[descriptor] IDs
 - For single-choice pages: options have routeTo, no routeButton
 - For multi-choice/mixed pages: routeButton required
 - For display-only pages: no options array
 - Minimum ${editRequest.minPages || 20} pages total
 - Professional, thorough approach
 
-RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.`;
+RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
 
     return prompt;
   }
@@ -612,17 +633,29 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.`;
     userIntent: string,
     context?: string
   ): string {
-    // [Keep existing implementation]
     return `
-Create a decision tree form for: "${userIntent}"
+Create a comprehensive decision tree form for: "${userIntent}"
 ${context ? `Additional context: ${context}` : ""}
 
 Generate a form that helps users with this specific request. The form should be relevant, practical, and directly address their needs.
 
-STRUCTURE RULES:
+REQUIRED JSON STRUCTURE:
+{
+  "name": "[Descriptive form name based on intent]",
+  "description": "[Comprehensive description of what this form accomplishes]",
+  "pages": [...]
+}
 
-1. "single-choice" pages: Options have routeTo field, no routeButton
-2. "multi-choice" pages: Options without routeTo, page has routeButton
+PAGE ID NAMING CONVENTION (CRITICAL):
+- ALWAYS use the format: page-[descriptor]
+- Examples: page-1, page-2, page-theft-1, page-injury-details-1, page-weather-2
+- For main flow: page-1, page-2, page-3, etc.
+- For branches: page-[topic]-[number] (e.g., page-theft-1, page-medical-2)
+- NEVER use camelCase or other formats
+
+STRUCTURE RULES:
+1. "single-choice" pages: Options have routeTo field pointing to page-[something], no routeButton
+2. "multi-choice" pages: Options without routeTo, page has routeButton with routeTo to page-[something]
 3. "mixed" pages: Mix of text inputs and options, page has routeButton  
 4. "display-only" pages: No options array, optional routeButton
 
@@ -636,8 +669,10 @@ For "${userIntent}", create a form that:
 - Professional follow-up questions and clarifications
 - Final resolution pages with detailed next steps
 - Must have at least 20 pages total
+- All page IDs MUST follow the page-[descriptor] format
+- All routeTo values MUST reference valid page-[descriptor] IDs
 
-RESPOND ONLY WITH VALID JSON.`;
+RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
   }
 
   private buildSubmissionAnalysisPrompt(
@@ -822,5 +857,84 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
 
   private generateFormId(): string {
     return `form-${Date.now()}-${uuidv4().split("-")[0]}`;
+  }
+
+  private generateFormName(userIntent: string): string {
+    // Generate a meaningful name based on the user intent
+    const keywords = userIntent.toLowerCase().split(" ");
+    if (keywords.includes("insurance") || keywords.includes("claim")) {
+      return "Insurance Claim Assistant";
+    } else if (keywords.includes("return") || keywords.includes("refund")) {
+      return "Product Return & Refund Form";
+    } else if (
+      keywords.includes("appointment") ||
+      keywords.includes("schedule")
+    ) {
+      return "Appointment Scheduling Assistant";
+    } else if (keywords.includes("support") || keywords.includes("help")) {
+      return "Customer Support Request Form";
+    } else {
+      // Capitalize first letter of each major word
+      const words = userIntent.split(" ").slice(0, 5);
+      return (
+        words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") +
+        " Form"
+      );
+    }
+  }
+
+  private generateFormDescription(userIntent: string): string {
+    return `Comprehensive form to help with: ${userIntent}. This guided process will collect all necessary information through a series of targeted questions.`;
+  }
+
+  private ensurePageIdFormat(pages: any[]): any[] {
+    // Ensure all page IDs follow the page-[something] format
+    return pages.map((page, index) => {
+      if (!page.id || !page.id.startsWith("page-")) {
+        // Generate appropriate page ID
+        if (page.title) {
+          // Try to create meaningful ID from title
+          const titleWords = page.title.toLowerCase().split(" ").slice(0, 3);
+          const descriptor = titleWords.join("-").replace(/[^a-z0-9-]/g, "");
+          page.id = `page-${descriptor}-${index + 1}`;
+        } else {
+          page.id = `page-${index + 1}`;
+        }
+      }
+
+      // Fix routeTo references in options
+      if (page.options && Array.isArray(page.options)) {
+        page.options = page.options.map((option: any) => {
+          if (option.routeTo && !option.routeTo.startsWith("page-")) {
+            // Try to fix the routeTo reference
+            if (option.routeTo.match(/^\d+$/)) {
+              option.routeTo = `page-${option.routeTo}`;
+            } else {
+              option.routeTo = `page-${option.routeTo
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, "-")}`;
+            }
+          }
+          return option;
+        });
+      }
+
+      // Fix routeButton routeTo
+      if (
+        page.routeButton &&
+        page.routeButton.routeTo &&
+        !page.routeButton.routeTo.startsWith("page-")
+      ) {
+        if (page.routeButton.routeTo.match(/^\d+$/)) {
+          page.routeButton.routeTo = `page-${page.routeButton.routeTo}`;
+        } else {
+          page.routeButton.routeTo = `page-${page.routeButton.routeTo
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, "-")}`;
+        }
+      }
+
+      return page;
+    });
   }
 }
