@@ -6,6 +6,7 @@ import {
   FormDefinition,
   FormGenerationRequest,
   FormSubmissionRequest,
+  FormEditRequest, // New type for edit requests
   ErrorResponse,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
@@ -84,6 +85,81 @@ app.post("/api/forms/generate", async (req, res) => {
     console.error("Form generation error:", error);
     const errorResponse: ErrorResponse = {
       error: "Failed to generate form",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// NEW: Edit/Regenerate form with specific modifications
+app.post("/api/forms/:id/edit", async (req, res) => {
+  try {
+    const formId = req.params.id;
+    const editRequest: FormEditRequest = req.body;
+
+    // Get the existing form
+    const existingForm = generatedForms.get(formId);
+    if (!existingForm) {
+      const error: ErrorResponse = { error: "Form not found" };
+      return res.status(404).json(error);
+    }
+
+    console.log(`Editing form ${formId} with modifications:`, {
+      hasNewIntent: !!editRequest.newIntent,
+      hasNewContext: !!editRequest.newContext,
+      pageModifications: editRequest.pageModifications?.length || 0,
+      regenerateAll: editRequest.regenerateAll || false,
+    });
+
+    // Use the edit-specific method in the AI service
+    const editedForm = await aiService.editForm(existingForm, editRequest);
+
+    // Update the cached form with the edited version
+    generatedForms.set(editedForm.id, editedForm);
+
+    console.log(`Form edited successfully: ${editedForm.id}`);
+    res.json(editedForm);
+  } catch (error) {
+    console.error("Form edit error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to edit form",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// NEW: Clone and edit form (creates a new form based on existing one)
+app.post("/api/forms/:id/clone-edit", async (req, res) => {
+  try {
+    const sourceFormId = req.params.id;
+    const editRequest: FormEditRequest = req.body;
+
+    // Get the existing form
+    const sourceForm = generatedForms.get(sourceFormId);
+    if (!sourceForm) {
+      const error: ErrorResponse = { error: "Source form not found" };
+      return res.status(404).json(error);
+    }
+
+    console.log(`Cloning and editing form ${sourceFormId}`);
+
+    // Create a clone with modifications
+    const clonedForm = await aiService.editForm(
+      sourceForm,
+      editRequest,
+      true // This flag indicates we want a new form ID
+    );
+
+    // Store the new form
+    generatedForms.set(clonedForm.id, clonedForm);
+
+    console.log(`Form cloned and edited successfully: ${clonedForm.id}`);
+    res.json(clonedForm);
+  } catch (error) {
+    console.error("Form clone-edit error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to clone and edit form",
       details: error instanceof Error ? error.message : "Unknown error",
     };
     res.status(500).json(errorResponse);

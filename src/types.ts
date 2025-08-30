@@ -5,6 +5,8 @@ export interface FormDefinition {
   pages: FormPage[];
   createdAt: string;
   generatedFrom?: string;
+  lastEditedAt?: string; // Track when form was last edited
+  editHistory?: EditHistoryEntry[]; // Optional edit history
 }
 
 export interface FormPage {
@@ -48,6 +50,83 @@ export interface FormGenerationRequest {
   context?: string;
 }
 
+// NEW: Form Edit Request Types
+export interface FormEditRequest {
+  // Option 1: Change the overall intent/context
+  newIntent?: string; // Replace the original user intent
+  newContext?: string; // Replace or add context
+
+  // Option 2: Specify exact modifications to pages
+  pageModifications?: PageModification[];
+
+  // Option 3: Add new pages
+  addPages?: AddPageRequest[];
+
+  // Option 4: Remove pages
+  removePageIds?: string[];
+
+  // Option 5: Regenerate specific pages or entire form
+  regeneratePageIds?: string[]; // Specific pages to regenerate
+  regenerateAll?: boolean; // Regenerate entire form with modifications
+
+  // Modification hints for AI
+  modificationHints?: string[]; // e.g., ["Make questions more detailed", "Add validation steps"]
+
+  // Preserve certain aspects
+  preserveStructure?: boolean; // Keep the same page flow
+  preservePageCount?: boolean; // Keep the same number of pages
+  minPages?: number; // Minimum pages requirement (default 20)
+}
+
+export interface PageModification {
+  pageId: string;
+
+  // What to change
+  newTitle?: string;
+  newInputType?: "single-choice" | "multi-choice" | "mixed" | "display-only";
+
+  // Option modifications
+  optionModifications?: OptionModification[];
+  addOptions?: PageOption[];
+  removeOptionIds?: string[];
+
+  // Routing changes
+  newRouteButton?: RouteButton;
+  removeRouteButton?: boolean;
+
+  // For display-only pages
+  newDisplayContent?: DisplayItem[];
+}
+
+export interface OptionModification {
+  optionId: string;
+  newLabel?: string;
+  newValue?: string;
+  newRouteTo?: string;
+  newRequired?: boolean;
+  newType?: "toggle" | "text-input" | "select" | "display";
+}
+
+export interface AddPageRequest {
+  afterPageId?: string; // Insert after this page
+  beforePageId?: string; // Insert before this page
+  suggestedTitle?: string;
+  suggestedInputType?:
+    | "single-choice"
+    | "multi-choice"
+    | "mixed"
+    | "display-only";
+  suggestedOptions?: string[]; // Simple string suggestions for AI to expand
+  purpose?: string; // Description of what this page should accomplish
+}
+
+export interface EditHistoryEntry {
+  editedAt: string;
+  editType: "regenerate" | "modify" | "add_pages" | "remove_pages";
+  description?: string;
+}
+
+// Existing types continue...
 export interface FormSubmissionRequest {
   responses: Record<string, any>;
 }
