@@ -6,7 +6,7 @@ import {
   FormDefinition,
   FormGenerationRequest,
   FormSubmissionRequest,
-  FormEditRequest, // New type for edit requests
+  FormEditRequest,
   ErrorResponse,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
@@ -91,7 +91,7 @@ app.post("/api/forms/generate", async (req, res) => {
   }
 });
 
-// NEW: Edit/Regenerate form with specific modifications
+// Edit/Regenerate form with specific modifications
 app.put("/api/forms/:id/edit", async (req, res) => {
   try {
     const formId = req.params.id;
@@ -129,7 +129,7 @@ app.put("/api/forms/:id/edit", async (req, res) => {
   }
 });
 
-// NEW: Clone and edit form (creates a new form based on existing one)
+// Clone and edit form (creates a new form based on existing one)
 app.put("/api/forms/:id/clone-edit", async (req, res) => {
   try {
     const sourceFormId = req.params.id;
@@ -254,6 +254,10 @@ app.get("/api/forms", (req, res) => {
     createdAt: form.createdAt,
     generatedFrom: form.generatedFrom,
     pageCount: form.pages.length,
+    lastEditedAt: form.lastEditedAt,
+    hasSubmissions: Array.from(formSubmissions.values()).some(
+      (sub) => sub.formId === form.id
+    ),
   }));
 
   res.json({ forms, total: forms.length });
@@ -267,6 +271,189 @@ app.get("/api/submissions/:id", (req, res) => {
     return res.status(404).json(error);
   }
   res.json(submission);
+});
+
+// ============== DELETE ENDPOINTS ==============
+
+// DELETE: Delete a specific form and its submissions
+app.delete("/api/forms/:id", (req, res) => {
+  try {
+    const formId = req.params.id;
+
+    // Check if form exists
+    const form = generatedForms.get(formId);
+    if (!form) {
+      const error: ErrorResponse = { error: "Form not found" };
+      return res.status(404).json(error);
+    }
+
+    // Delete all submissions associated with this form
+    let deletedSubmissions = 0;
+    for (const [submissionId, submission] of formSubmissions.entries()) {
+      if (submission.formId === formId) {
+        formSubmissions.delete(submissionId);
+        deletedSubmissions++;
+      }
+    }
+
+    // Delete the form
+    generatedForms.delete(formId);
+
+    console.log(
+      `Deleted form ${formId} and ${deletedSubmissions} associated submissions`
+    );
+
+    res.json({
+      success: true,
+      message: "Form deleted successfully",
+      deletedForm: {
+        id: form.id,
+        name: form.name,
+      },
+      deletedSubmissions,
+    });
+  } catch (error) {
+    console.error("Form deletion error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete form",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// DELETE: Delete all forms (requires confirmation)
+app.delete("/api/forms", (req, res) => {
+  try {
+    // Require explicit confirmation to prevent accidental deletion
+    const { confirm } = req.query;
+    if (confirm !== "true") {
+      const error: ErrorResponse = {
+        error: "Confirmation required",
+        details: "Add ?confirm=true to the URL to delete all forms",
+      };
+      return res.status(400).json(error);
+    }
+
+    const totalForms = generatedForms.size;
+    const totalSubmissions = formSubmissions.size;
+
+    // Clear all forms and submissions
+    generatedForms.clear();
+    formSubmissions.clear();
+
+    console.log(
+      `Deleted all forms (${totalForms}) and submissions (${totalSubmissions})`
+    );
+
+    res.json({
+      success: true,
+      message: "All forms deleted successfully",
+      deletedForms: totalForms,
+      deletedSubmissions: totalSubmissions,
+    });
+  } catch (error) {
+    console.error("Delete all forms error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete all forms",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// POST: Batch delete forms
+app.post("/api/forms/delete-batch", (req, res) => {
+  try {
+    const { formIds } = req.body;
+
+    if (!formIds || !Array.isArray(formIds) || formIds.length === 0) {
+      const error: ErrorResponse = {
+        error: "Invalid request",
+        details: "formIds must be a non-empty array",
+      };
+      return res.status(400).json(error);
+    }
+
+    const results = {
+      deleted: [] as string[],
+      notFound: [] as string[],
+      totalSubmissionsDeleted: 0,
+    };
+
+    // Process each form ID
+    for (const formId of formIds) {
+      const form = generatedForms.get(formId);
+
+      if (form) {
+        // Delete associated submissions
+        for (const [submissionId, submission] of formSubmissions.entries()) {
+          if (submission.formId === formId) {
+            formSubmissions.delete(submissionId);
+            results.totalSubmissionsDeleted++;
+          }
+        }
+
+        // Delete the form
+        generatedForms.delete(formId);
+        results.deleted.push(formId);
+      } else {
+        results.notFound.push(formId);
+      }
+    }
+
+    console.log(
+      `Batch delete: ${results.deleted.length} forms deleted, ` +
+        `${results.notFound.length} not found, ` +
+        `${results.totalSubmissionsDeleted} submissions deleted`
+    );
+
+    res.json({
+      success: true,
+      message: `Deleted ${results.deleted.length} forms`,
+      results,
+    });
+  } catch (error) {
+    console.error("Batch delete error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete forms",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// GET: Get all submissions for a specific form
+app.get("/api/forms/:id/submissions", (req, res) => {
+  try {
+    const formId = req.params.id;
+
+    // Check if form exists
+    const form = generatedForms.get(formId);
+    if (!form) {
+      const error: ErrorResponse = { error: "Form not found" };
+      return res.status(404).json(error);
+    }
+
+    // Get all submissions for this form
+    const submissions = Array.from(formSubmissions.values()).filter(
+      (submission) => submission.formId === formId
+    );
+
+    res.json({
+      formId,
+      formName: form.name,
+      submissions,
+      total: submissions.length,
+    });
+  } catch (error) {
+    console.error("Get form submissions error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to get form submissions",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
 });
 
 // Error handling middleware
@@ -304,4 +491,15 @@ app.listen(PORT, () => {
       openaiApiKey ? "Configured" : "Missing API Key"
     }`
   );
+  console.log(`\n📝 Available endpoints:`);
+  console.log(`  POST   /api/forms/generate        - Generate new form`);
+  console.log(`  GET    /api/forms                 - List all forms`);
+  console.log(`  GET    /api/forms/:id             - Get specific form`);
+  console.log(`  PUT    /api/forms/:id/edit        - Edit existing form`);
+  console.log(`  PUT    /api/forms/:id/clone-edit  - Clone and edit form`);
+  console.log(`  DELETE /api/forms/:id             - Delete specific form`);
+  console.log(`  DELETE /api/forms?confirm=true    - Delete all forms`);
+  console.log(`  POST   /api/forms/delete-batch    - Batch delete forms`);
+  console.log(`  POST   /api/forms/:id/submit      - Submit form response`);
+  console.log(`  GET    /api/forms/:id/submissions - Get form submissions`);
 });
