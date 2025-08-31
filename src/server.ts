@@ -92,7 +92,7 @@ app.post("/api/forms/generate", async (req, res) => {
 });
 
 // NEW: Edit/Regenerate form with specific modifications
-app.post("/api/forms/:id/edit", async (req, res) => {
+app.put("/api/forms/:id/edit", async (req, res) => {
   try {
     const formId = req.params.id;
     const editRequest: FormEditRequest = req.body;
@@ -130,7 +130,7 @@ app.post("/api/forms/:id/edit", async (req, res) => {
 });
 
 // NEW: Clone and edit form (creates a new form based on existing one)
-app.post("/api/forms/:id/clone-edit", async (req, res) => {
+app.put("/api/forms/:id/clone-edit", async (req, res) => {
   try {
     const sourceFormId = req.params.id;
     const editRequest: FormEditRequest = req.body;
