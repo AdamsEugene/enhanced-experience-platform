@@ -154,6 +154,8 @@ CRITICAL STRUCTURE RULES:
    - Page MUST have routeButton
    
 4. "display-only" pages: 
+   - ONLY USE FOR FINAL SUCCESS/COMPLETION PAGES (last 1-2 pages)
+   - NEVER use display-only for introductory or middle pages
    - For final confirmation, use options array with display items
    - Each option: { "id": "info-1", "type": "display", "label": "Field Name", "value": "field-value" }
    Example:
@@ -166,6 +168,13 @@ CRITICAL STRUCTURE RULES:
        { "id": "info-2", "type": "display", "label": "Status", "value": "Under Review" }
      ]
    }
+
+IMPORTANT RULES:
+- The FIRST page should ALWAYS be actionable (single-choice or multi-choice)
+- NEVER use display-only for welcome/introduction pages
+- Use single-choice for initial categorization questions
+- Only the FINAL success/confirmation page should be display-only
+- All navigation pages must allow user interaction
 
 IMPORTANT VALUE FIELD RULES:
 - For single-choice: value is the data value (e.g., "collision", "theft")
@@ -180,7 +189,35 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
   }
 
   private fixPageStructures(pages: any[]): any[] {
-    return pages.map((page) => {
+    return pages.map((page, pageIndex) => {
+      // Check if this should be display-only (only for final pages)
+      const isFinalPage = pageIndex >= pages.length - 2; // Last or second-to-last page
+      const looksLikeFinalPage =
+        page.title?.toLowerCase().includes("success") ||
+        page.title?.toLowerCase().includes("completed") ||
+        page.title?.toLowerCase().includes("submitted") ||
+        page.title?.toLowerCase().includes("congratulations");
+
+      // If page is incorrectly marked as display-only but shouldn't be, convert it
+      if (
+        page.inputType === "display-only" &&
+        !isFinalPage &&
+        !looksLikeFinalPage
+      ) {
+        // Convert to appropriate interactive type based on content
+        if (page.options && page.options.length > 0) {
+          // If it has multiple options that look like choices, make it single-choice
+          page.inputType = "single-choice";
+          page.options = page.options.map((opt: any, idx: number) => ({
+            id: opt.id || `opt-${idx + 1}`,
+            label: opt.label || opt.value || "Continue",
+            value: opt.value || `option-${idx + 1}`,
+            routeTo:
+              this.findNextPageId(pages, page.id) || `page-${pageIndex + 2}`,
+          }));
+        }
+      }
+
       // Fix single-choice pages
       if (page.inputType === "single-choice") {
         if (page.options && Array.isArray(page.options)) {
@@ -191,7 +228,8 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
               opt.value ||
               opt.label?.toLowerCase().replace(/\s+/g, "-") ||
               "option",
-            routeTo: opt.routeTo || "page-end",
+            routeTo:
+              opt.routeTo || this.findNextPageId(pages, page.id) || "page-end",
           }));
         }
         // Remove routeButton if present
@@ -277,18 +315,44 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
         }
       }
 
-      // Fix display-only pages
+      // Fix display-only pages (only for actual final/success pages)
       else if (page.inputType === "display-only") {
-        if (page.options && Array.isArray(page.options)) {
-          page.options = page.options.map((opt: any, idx: number) => ({
-            id: opt.id || `info-${idx + 1}`,
-            type: "display",
-            label: opt.label || `Information ${idx + 1}`,
-            value: opt.value || "",
-          }));
+        // Only keep as display-only if it's actually a final page
+        if (isFinalPage || looksLikeFinalPage) {
+          if (page.options && Array.isArray(page.options)) {
+            page.options = page.options.map((opt: any, idx: number) => ({
+              id: opt.id || `info-${idx + 1}`,
+              type: "display",
+              label: opt.label || `Information ${idx + 1}`,
+              value: opt.value || "",
+            }));
+          }
+          // Remove routeButton from display-only pages
+          delete page.routeButton;
+        } else {
+          // Convert to single-choice if it's not actually a final page
+          page.inputType = "single-choice";
+          if (!page.options || page.options.length === 0) {
+            page.options = [
+              {
+                id: "opt-continue",
+                label: "Continue",
+                value: "continue",
+                routeTo:
+                  this.findNextPageId(pages, page.id) ||
+                  `page-${pageIndex + 2}`,
+              },
+            ];
+          } else {
+            page.options = page.options.map((opt: any, idx: number) => ({
+              id: opt.id || `opt-${idx + 1}`,
+              label: opt.label || "Continue",
+              value: opt.value || `option-${idx + 1}`,
+              routeTo:
+                this.findNextPageId(pages, page.id) || `page-${pageIndex + 2}`,
+            }));
+          }
         }
-        // Remove routeButton from display-only pages
-        delete page.routeButton;
       }
 
       return page;
