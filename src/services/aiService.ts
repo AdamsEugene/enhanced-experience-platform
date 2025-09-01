@@ -84,6 +84,9 @@ export class OpenAIService implements AIService {
         // Fix page structures to match expected format
         result.pages = this.fixPageStructures(result.pages);
 
+        // CRITICAL: Validate all routing and fix broken routes
+        result.pages = this.validateAndFixRouting(result.pages);
+
         console.log(`✅ Form generated successfully on attempt ${attempt}`);
         console.log(`Generated ${result.pages?.length || 0} pages`);
 
@@ -137,53 +140,59 @@ CRITICAL STRUCTURE RULES:
 1. "single-choice" pages: 
    - Options MUST have: id, label, value (the actual value), routeTo (page-[something])
    - NO routeButton needed
+   - EVERY routeTo MUST point to an EXISTING page in the form
    Example option: { "id": "opt-1", "label": "Vehicle collision", "value": "collision", "routeTo": "page-2" }
 
 2. "multi-choice" pages: 
    - Options MUST have: id, label, value (the actual value)
    - NO routeTo in options
-   - Page MUST have routeButton with label and routeTo
+   - Page MUST have routeButton with label and routeTo pointing to EXISTING page
    Example option: { "id": "opt-1", "label": "Police report filed", "value": "police-report" }
    Example routeButton: { "label": "Continue", "routeTo": "page-5" }
 
 3. "mixed" pages: 
    - Options array contains ALL inputs (text, toggle, etc.)
    - Each option MUST have: id, type, label, value (empty string "" for text inputs), required (for text)
+   - SUPPORTED INPUT TYPES: "text", "email", "tel", "date", "number", "textarea", "toggle", "radio", "select"
    - Text input: { "id": "opt-1", "type": "text", "label": "Date of incident", "value": "", "required": true }
-   - Toggle: { "id": "opt-2", "type": "toggle", "label": "Police involved", "value": "police-involved" }
-   - Page MUST have routeButton
+   - Email input: { "id": "opt-2", "type": "email", "label": "Email address", "value": "", "required": true }
+   - Phone input: { "id": "opt-3", "type": "tel", "label": "Phone number", "value": "", "required": true }
+   - Date input: { "id": "opt-4", "type": "date", "label": "Date of birth", "value": "", "required": true }
+   - Number input: { "id": "opt-5", "type": "number", "label": "Age", "value": "", "required": false }
+   - Textarea: { "id": "opt-6", "type": "textarea", "label": "Describe what happened", "value": "", "required": true }
+   - Toggle: { "id": "opt-7", "type": "toggle", "label": "Police involved", "value": "police-involved" }
+   - Radio: { "id": "opt-8", "type": "radio", "label": "Severity level", "value": "severity", "selectOptions": [{"label": "Minor", "value": "minor"}, {"label": "Major", "value": "major"}] }
+   - Select: { "id": "opt-9", "type": "select", "label": "State", "value": "", "selectOptions": [{"label": "California", "value": "CA"}, {"label": "Texas", "value": "TX"}] }
+   - Page MUST have routeButton pointing to EXISTING page
    
 4. "display-only" pages: 
    - ONLY USE FOR FINAL SUCCESS/COMPLETION PAGES (last 1-2 pages)
-   - NEVER use display-only for introductory or middle pages
-   - For final confirmation, use options array with display items
    - Each option: { "id": "info-1", "type": "display", "label": "Field Name", "value": "field-value" }
-   Example:
-   {
-     "id": "page-14",
-     "title": "Your claim has been submitted!",
-     "inputType": "display-only",
-     "options": [
-       { "id": "info-1", "type": "display", "label": "Claim Number", "value": "AC-2024-001234" },
-       { "id": "info-2", "type": "display", "label": "Status", "value": "Under Review" }
-     ]
-   }
 
-IMPORTANT RULES:
-- The FIRST page should ALWAYS be actionable (single-choice or multi-choice)
-- NEVER use display-only for welcome/introduction pages
-- Use single-choice for initial categorization questions
-- Only the FINAL success/confirmation page should be display-only
-- All navigation pages must allow user interaction
+ROUTING VALIDATION REQUIREMENTS:
+- EVERY routeTo field MUST reference a page that EXISTS in the form
+- Create ALL referenced pages - if you reference "page-theft-1", that page MUST exist
+- Use descriptive routing: instead of generic "page-5", use "page-damage-assessment" or "page-contact-info"
+- NO broken routes allowed - every path must lead somewhere valid
 
-IMPORTANT VALUE FIELD RULES:
-- For single-choice: value is the data value (e.g., "collision", "theft")
-- For multi-choice: value is the data value (e.g., "police-report", "photos-taken")
-- For mixed text inputs: value is ALWAYS empty string ""
-- For mixed toggles: value is the data value (e.g., "police-involved")
-- For display-only: value contains the display text
+INPUT TYPE SELECTION GUIDE:
+- Use "text" for short text (names, addresses, brief descriptions)
+- Use "textarea" for long descriptions or detailed explanations
+- Use "email" for email addresses (includes validation)
+- Use "tel" for phone numbers (includes validation)
+- Use "date" for date selections
+- Use "number" for numeric inputs (ages, amounts, quantities)
+- Use "toggle" for yes/no or include/exclude options
+- Use "radio" for single selection from predefined options
+- Use "select" for dropdown selections
 
 Create MINIMUM 20 pages that comprehensively cover the user's intent.
+
+CRITICAL: Before finalizing the form, verify that:
+1. Every routeTo value references an EXISTING page ID in the pages array
+2. No page is referenced but missing from the form
+3. All mixed page options have appropriate input types
+4. The routing creates a complete, navigable experience
 
 RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
   }
@@ -259,7 +268,7 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
         }
       }
 
-      // Fix mixed pages
+      // Fix mixed pages - ENHANCED with proper input types
       else if (page.inputType === "mixed") {
         if (page.options && Array.isArray(page.options)) {
           page.options = page.options.map((opt: any) => {
@@ -268,37 +277,36 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
               label: opt.label || "Field",
             };
 
-            // Determine type if not specified
-            if (!opt.type) {
-              if (
-                opt.required !== undefined ||
-                opt.label?.toLowerCase().includes("describe") ||
-                opt.label?.toLowerCase().includes("enter") ||
-                opt.label?.toLowerCase().includes("provide")
-              ) {
-                opt.type = "text";
-              } else {
-                opt.type = "toggle";
-              }
+            // Determine type if not specified or fix existing type
+            if (!opt.type || opt.type === "text-input") {
+              fixedOpt.type = this.determineInputType(opt.label);
+            } else {
+              // Validate and normalize the input type
+              fixedOpt.type = this.normalizeInputType(opt.type);
             }
 
-            fixedOpt.type = opt.type;
-
             // Set value based on type
-            if (opt.type === "text" || opt.type === "text-input") {
-              fixedOpt.type = "text"; // Normalize to "text"
-              fixedOpt.value = ""; // Text inputs always have empty string
+            if (this.isTextInputType(fixedOpt.type)) {
+              fixedOpt.value = ""; // Text-based inputs always have empty string
               fixedOpt.required =
                 opt.required !== undefined ? opt.required : true;
-            } else if (opt.type === "toggle") {
+            } else if (fixedOpt.type === "toggle") {
               fixedOpt.value =
                 opt.value ||
                 opt.label?.toLowerCase().replace(/\s+/g, "-") ||
                 "toggle-value";
-            } else if (opt.type === "select") {
+            } else if (
+              fixedOpt.type === "radio" ||
+              fixedOpt.type === "select"
+            ) {
               fixedOpt.value = opt.value || "";
               if (opt.selectOptions) {
                 fixedOpt.selectOptions = opt.selectOptions;
+              } else {
+                // Generate some default options if none provided
+                fixedOpt.selectOptions = this.generateDefaultSelectOptions(
+                  opt.label
+                );
               }
             }
 
@@ -357,6 +365,260 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
 
       return page;
     });
+  }
+
+  // NEW METHOD: Determine appropriate input type based on label
+  private determineInputType(label: string): string {
+    const lowerLabel = label.toLowerCase();
+
+    if (lowerLabel.includes("email") || lowerLabel.includes("e-mail")) {
+      return "email";
+    } else if (
+      lowerLabel.includes("phone") ||
+      lowerLabel.includes("tel") ||
+      (lowerLabel.includes("number") && lowerLabel.includes("contact"))
+    ) {
+      return "tel";
+    } else if (
+      lowerLabel.includes("date") ||
+      lowerLabel.includes("when") ||
+      lowerLabel.includes("time")
+    ) {
+      return "date";
+    } else if (
+      lowerLabel.includes("age") ||
+      lowerLabel.includes("amount") ||
+      lowerLabel.includes("cost") ||
+      lowerLabel.includes("price") ||
+      lowerLabel.includes("quantity")
+    ) {
+      return "number";
+    } else if (
+      lowerLabel.includes("describe") ||
+      lowerLabel.includes("explain") ||
+      lowerLabel.includes("details") ||
+      lowerLabel.includes("comments")
+    ) {
+      return "textarea";
+    } else if (
+      lowerLabel.includes("yes") ||
+      lowerLabel.includes("no") ||
+      lowerLabel.includes("check") ||
+      lowerLabel.includes("select")
+    ) {
+      return "toggle";
+    } else {
+      return "text"; // Default for most cases
+    }
+  }
+
+  // NEW METHOD: Normalize input type to supported values
+  private normalizeInputType(type: string): string {
+    const supportedTypes = [
+      "text",
+      "email",
+      "tel",
+      "date",
+      "number",
+      "textarea",
+      "toggle",
+      "radio",
+      "select",
+    ];
+
+    // Handle common variations
+    const typeMap: Record<string, string> = {
+      "text-input": "text",
+      "text-area": "textarea",
+      phone: "tel",
+      telephone: "tel",
+      datetime: "date",
+      checkbox: "toggle",
+      check: "toggle",
+      dropdown: "select",
+    };
+
+    const normalizedType = typeMap[type.toLowerCase()] || type.toLowerCase();
+
+    return supportedTypes.includes(normalizedType) ? normalizedType : "text";
+  }
+
+  // NEW METHOD: Check if type is text-based input
+  private isTextInputType(type: string): boolean {
+    return ["text", "email", "tel", "date", "number", "textarea"].includes(
+      type
+    );
+  }
+
+  // NEW METHOD: Generate default options for radio/select inputs
+  private generateDefaultSelectOptions(
+    label: string
+  ): Array<{ label: string; value: string }> {
+    const lowerLabel = label.toLowerCase();
+
+    if (lowerLabel.includes("state") || lowerLabel.includes("province")) {
+      return [
+        { label: "California", value: "CA" },
+        { label: "Texas", value: "TX" },
+        { label: "New York", value: "NY" },
+        { label: "Florida", value: "FL" },
+        { label: "Other", value: "other" },
+      ];
+    } else if (
+      lowerLabel.includes("severity") ||
+      lowerLabel.includes("level")
+    ) {
+      return [
+        { label: "Low", value: "low" },
+        { label: "Medium", value: "medium" },
+        { label: "High", value: "high" },
+      ];
+    } else if (
+      lowerLabel.includes("priority") ||
+      lowerLabel.includes("urgency")
+    ) {
+      return [
+        { label: "Low Priority", value: "low" },
+        { label: "Medium Priority", value: "medium" },
+        { label: "High Priority", value: "high" },
+        { label: "Urgent", value: "urgent" },
+      ];
+    } else {
+      return [
+        { label: "Option 1", value: "option1" },
+        { label: "Option 2", value: "option2" },
+        { label: "Option 3", value: "option3" },
+      ];
+    }
+  }
+
+  // NEW METHOD: Validate all routing and fix broken routes
+  private validateAndFixRouting(pages: any[]): any[] {
+    console.log("🔍 Validating routing for all pages...");
+
+    // Create a set of all valid page IDs
+    const validPageIds = new Set(pages.map((page) => page.id));
+    console.log("Valid page IDs:", Array.from(validPageIds));
+
+    // Track broken routes for fixing
+    const brokenRoutes: Array<{ pageId: string; routeTo: string }> = [];
+
+    // Check all routing references
+    pages.forEach((page) => {
+      // Check single-choice option routing
+      if (page.inputType === "single-choice" && page.options) {
+        page.options.forEach((opt: any) => {
+          if (opt.routeTo && !validPageIds.has(opt.routeTo)) {
+            brokenRoutes.push({ pageId: page.id, routeTo: opt.routeTo });
+            console.log(`❌ Broken route: ${page.id} -> ${opt.routeTo}`);
+          }
+        });
+      }
+
+      // Check routeButton routing
+      if (
+        page.routeButton?.routeTo &&
+        !validPageIds.has(page.routeButton.routeTo)
+      ) {
+        brokenRoutes.push({
+          pageId: page.id,
+          routeTo: page.routeButton.routeTo,
+        });
+        console.log(
+          `❌ Broken routeButton: ${page.id} -> ${page.routeButton.routeTo}`
+        );
+      }
+    });
+
+    // Fix broken routes
+    if (brokenRoutes.length > 0) {
+      console.log(`🔧 Fixing ${brokenRoutes.length} broken routes...`);
+
+      pages = pages.map((page) => {
+        // Fix single-choice options
+        if (page.inputType === "single-choice" && page.options) {
+          page.options = page.options.map((opt: any) => {
+            if (opt.routeTo && !validPageIds.has(opt.routeTo)) {
+              // Find the best replacement route
+              const newRoute = this.findBestReplacement(
+                opt.routeTo,
+                validPageIds,
+                pages,
+                page.id
+              );
+              console.log(`🔧 Fixed route: ${opt.routeTo} -> ${newRoute}`);
+              opt.routeTo = newRoute;
+            }
+            return opt;
+          });
+        }
+
+        // Fix routeButton
+        if (
+          page.routeButton?.routeTo &&
+          !validPageIds.has(page.routeButton.routeTo)
+        ) {
+          const newRoute = this.findBestReplacement(
+            page.routeButton.routeTo,
+            validPageIds,
+            pages,
+            page.id
+          );
+          console.log(
+            `🔧 Fixed routeButton: ${page.routeButton.routeTo} -> ${newRoute}`
+          );
+          page.routeButton.routeTo = newRoute;
+        }
+
+        return page;
+      });
+    }
+
+    console.log("✅ Routing validation complete");
+    return pages;
+  }
+
+  // NEW METHOD: Find best replacement for broken route
+  private findBestReplacement(
+    brokenRoute: string,
+    validPageIds: Set<string>,
+    pages: any[],
+    currentPageId: string
+  ): string {
+    // Strategy 1: Look for similar page ID
+    const similarPages = Array.from(validPageIds).filter(
+      (pageId) =>
+        pageId.includes(brokenRoute.replace("page-", "")) ||
+        brokenRoute.includes(pageId.replace("page-", ""))
+    );
+
+    if (similarPages.length > 0) {
+      return similarPages[0];
+    }
+
+    // Strategy 2: Find next sequential page
+    const currentIndex = pages.findIndex((p) => p.id === currentPageId);
+    if (currentIndex >= 0 && currentIndex < pages.length - 1) {
+      return pages[currentIndex + 1].id;
+    }
+
+    // Strategy 3: Find next page in sequence or create end page
+    const pageNumbers = Array.from(validPageIds)
+      .filter((id) => id.match(/^page-\d+$/))
+      .map((id) => parseInt(id.replace("page-", "")))
+      .sort((a, b) => a - b);
+
+    if (pageNumbers.length > 0) {
+      const highestNumber = Math.max(...pageNumbers);
+      const nextPageId = `page-${highestNumber}`;
+      if (validPageIds.has(nextPageId)) {
+        return nextPageId;
+      }
+    }
+
+    // Strategy 4: Return first available page or create final page reference
+    const firstPage = Array.from(validPageIds)[0];
+    return firstPage || "page-end";
   }
 
   private findNextPageId(pages: any[], currentPageId: string): string | null {
@@ -449,7 +711,7 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     }
   }
 
-  // Keep the editForm and other methods as they were, just ensure they also use fixPageStructures
+  // Keep the editForm and other methods as they were, just ensure they also use the new validation
   async editForm(
     existingForm: FormDefinition,
     editRequest: FormEditRequest,
@@ -502,6 +764,9 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
       // Apply structure fixes to edited form
       editedForm.pages = this.fixPageStructures(editedForm.pages);
 
+      // CRITICAL: Validate routing after edits
+      editedForm.pages = this.validateAndFixRouting(editedForm.pages);
+
       return editedForm;
     } catch (error) {
       console.error("Error editing form:", error);
@@ -513,7 +778,6 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     }
   }
 
-  // Keep all other methods unchanged but ensure they use fixPageStructures
   private async regenerateEntireForm(
     existingForm: FormDefinition,
     editRequest: FormEditRequest
@@ -530,7 +794,7 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
         {
           role: "system",
           content:
-            "You are an expert at editing and improving forms. You will regenerate an entire form based on modifications requested, maintaining the core purpose while implementing the requested changes. Always return valid JSON only. Ensure all options have proper value fields.",
+            "You are an expert at editing and improving forms. You will regenerate an entire form based on modifications requested, maintaining the core purpose while implementing the requested changes. Always return valid JSON only. Ensure all options have proper value fields and appropriate input types for mixed pages.",
         },
         {
           role: "user",
@@ -563,7 +827,6 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     return result;
   }
 
-  // Include other required methods with similar fixes...
   private buildEditPrompt(
     existingForm: FormDefinition,
     editRequest: FormEditRequest,
@@ -599,10 +862,13 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     prompt += `\n\nCRITICAL REQUIREMENTS:
 - Return the COMPLETE modified form as valid JSON
 - ALL page IDs MUST use format: page-[descriptor]
-- For single-choice: options have id, label, value, routeTo
-- For multi-choice: options have id, label, value (no routeTo), page has routeButton
+- EVERY routeTo MUST point to an EXISTING page in the form
+- For single-choice: options have id, label, value, routeTo (to existing page)
+- For multi-choice: options have id, label, value (no routeTo), page has routeButton (to existing page)
 - For mixed: options have id, type, label, value ("" for text), required (for text)
+- MIXED PAGE INPUT TYPES: text, email, tel, date, number, textarea, toggle, radio, select
 - For display-only: options have id, type:"display", label, value
+- Create ALL pages that are referenced in routing
 
 RESPOND ONLY WITH VALID JSON.`;
 
