@@ -199,6 +199,9 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
 
   private fixPageStructures(pages: any[]): any[] {
     return pages.map((page, pageIndex) => {
+      // Add text content to every page - text should equal the label (which is the title)
+      page.text = page.label || "";
+
       // Check if this should be display-only (only for final pages)
       const isFinalPage = pageIndex >= pages.length - 2; // Last or second-to-last page
       const looksLikeFinalPage =
