@@ -4,6 +4,7 @@ import {
   FormEditRequest,
   PageModification,
   AddPageRequest,
+  FeedbackEditRequest,
 } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import OpenAI from "openai";
@@ -877,6 +878,81 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     }
   }
 
+  async editFormWithFeedback(
+    existingForm: FormDefinition,
+    feedbackRequest: FeedbackEditRequest
+  ): Promise<FormDefinition> {
+    try {
+      console.log("Processing feedback-based form edit...");
+
+      const prompt = this.buildFeedbackEditPrompt(
+        existingForm,
+        feedbackRequest
+      );
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert form designer who makes precise improvements based on user feedback. 
+          You modify existing forms by applying specific feedback to individual pages while maintaining the overall structure and flow.
+          
+          CRITICAL RULES:
+          - Return the COMPLETE modified form JSON (all pages, even unchanged ones)
+          - Apply feedback carefully - don't over-modify
+          - Maintain existing page IDs unless absolutely necessary
+          - Keep routing intact unless feedback specifically requires changes
+          - For "too many options" feedback: reduce to 3-4 most relevant options
+          - For "too few options" feedback: add 1-2 more relevant options
+          - For "need text fields" feedback: convert to mixed inputType and add appropriate text inputs
+          - For "too many fields" feedback: consolidate or split across multiple pages
+          - Preserve the form's core purpose and intent
+          - Always respond with valid JSON only`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 4095,
+        temperature: 0.1,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
+      }
+
+      const formJson = this.extractJSONFromResponse(
+        content,
+        existingForm.generatedFrom || "feedback edit"
+      );
+
+      const result: FormDefinition = {
+        ...existingForm,
+        name: formJson.name || existingForm.name,
+        description: formJson.description || existingForm.description,
+        pages: this.ensurePageIdFormat(formJson.pages || existingForm.pages),
+        lastEditedAt: new Date().toISOString(),
+      };
+
+      // Apply structure fixes
+      result.pages = this.fixPageStructures(result.pages);
+      result.pages = this.validateAndFixRouting(result.pages);
+
+      console.log("✅ Feedback-based edit completed successfully");
+      return result;
+    } catch (error) {
+      console.error("Error in feedback-based edit:", error);
+      throw new Error(
+        `Failed to process feedback edit: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
   private async regenerateEntireForm(
     existingForm: FormDefinition,
     editRequest: FormEditRequest
@@ -1149,5 +1225,78 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
   ): Promise<FormDefinition> {
     // Implementation similar to regenerateEntireForm
     return this.regenerateEntireForm(existingForm, editRequest);
+  }
+
+  private buildFeedbackEditPrompt(
+    existingForm: FormDefinition,
+    feedbackRequest: FeedbackEditRequest
+  ): string {
+    let prompt = `TASK: Apply specific feedback to improve this existing form.
+
+EXISTING FORM:
+${JSON.stringify(existingForm, null, 2)}
+
+FEEDBACK TO APPLY:
+`;
+
+    if (
+      feedbackRequest.pageSpecificFeedback &&
+      feedbackRequest.pageSpecificFeedback.length > 0
+    ) {
+      prompt += `\nPAGE-SPECIFIC FEEDBACK:\n`;
+      feedbackRequest.pageSpecificFeedback.forEach((pageFeedback) => {
+        prompt += `\nPage ID: ${pageFeedback.pageId}\n`;
+        prompt += `Page Title: "${pageFeedback.pageTitle}"\n`;
+        prompt += `Feedback:\n`;
+        pageFeedback.feedbacks.forEach((feedback, idx) => {
+          prompt += `  ${idx + 1}. ${feedback}\n`;
+        });
+      });
+    }
+
+    if (feedbackRequest.generalFeedback) {
+      prompt += `\nGENERAL FEEDBACK:\n${feedbackRequest.generalFeedback}\n`;
+    }
+
+    prompt += `\n\nHOW TO APPLY FEEDBACK:
+
+For "too many options" feedback:
+- Reduce options to 3-4 most essential/relevant choices
+- Combine similar options if possible
+- Remove redundant or less important options
+
+For "too few options" feedback:
+- Add 1-2 more relevant options that users might need
+- Consider edge cases or alternative scenarios
+- Don't add options just to reach a number - they must be meaningful
+
+For "need text fields" feedback:
+- Change inputType to "mixed" if not already
+- Add appropriate text input options with proper types (text, email, tel, date, number, textarea)
+- Determine best input type based on what information is needed
+- Make text fields required: true for essential information
+
+For "too many fields" feedback:
+- Reduce number of input fields on that page
+- Split complex pages into multiple simpler pages
+- Keep only the most essential fields for that step
+- Consider moving some fields to later pages
+
+For general feedback like "add new pages":
+- Add relevant new pages that enhance the form's usefulness
+- Insert pages at logical points in the flow
+- Ensure new pages have proper routing to/from existing pages
+
+CRITICAL STRUCTURE REQUIREMENTS:
+- Return the COMPLETE form with ALL pages (modified and unmodified)
+- Maintain existing page IDs unless feedback requires structural changes
+- ALL routeTo references MUST point to pages that exist in the form
+- For mixed pages, use proper input types: text, email, tel, date, number, textarea, toggle, radio, select
+- Ensure all text-based inputs have value: "" and appropriate required: true/false
+- Validate that every page referenced in routing actually exists
+
+RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
+
+    return prompt;
   }
 }

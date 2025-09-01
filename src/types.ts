@@ -151,3 +151,26 @@ export interface ErrorResponse {
   error: string;
   details?: string;
 }
+
+export interface PageFeedback {
+  pageId: string;
+  pageTitle: string;
+  feedbacks: string[];
+}
+
+export interface FeedbackEditRequest {
+  pageSpecificFeedback?: PageFeedback[];
+  generalFeedback?: string;
+}
+
+export interface FeedbackEditResponse {
+  success: boolean;
+  message: string;
+  editedForm: FormDefinition;
+  modifications: {
+    pagesModified: string[];
+    pagesAdded: string[];
+    pagesRemoved: string[];
+    generalChanges: string[];
+  };
+}
