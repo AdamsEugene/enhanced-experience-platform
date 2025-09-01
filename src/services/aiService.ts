@@ -134,6 +134,7 @@ PAGE ID NAMING CONVENTION (CRITICAL):
 - Examples: page-1, page-2, page-theft-1, page-injury-details-1, page-weather-2
 - For main flow: page-1, page-2, page-3, etc.
 - For branches: page-[topic]-[number] (e.g., page-theft-1, page-medical-2)
+- each page should have a type field (single-choice, multi-choice, mixed, display-only, radio, select, toggle, text, textarea, email, tel, date, number ...)
 - NEVER use camelCase or other formats
 
 CRITICAL STRUCTURE RULES:
