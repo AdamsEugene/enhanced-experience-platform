@@ -169,15 +169,18 @@ app.put("/api/forms/:id/clone-edit", async (req, res) => {
 });
 
 // Edit form based on user feedback
-app.put('/api/forms/:id/feedback-edit', async (req, res) => {
+app.put("/api/forms/:id/feedback-edit", async (req, res) => {
   try {
     const formId = req.params.id;
     const feedbackRequest: FeedbackEditRequest = req.body;
 
     // Validate request
-    if (!feedbackRequest.pageSpecificFeedback && !feedbackRequest.generalFeedback) {
-      const error: ErrorResponse = { 
-        error: 'Either pageSpecificFeedback or generalFeedback is required' 
+    if (
+      !feedbackRequest.pageSpecificFeedback &&
+      !feedbackRequest.generalFeedback
+    ) {
+      const error: ErrorResponse = {
+        error: "Either pageSpecificFeedback or generalFeedback is required",
       };
       return res.status(400).json(error);
     }
@@ -185,59 +188,129 @@ app.put('/api/forms/:id/feedback-edit', async (req, res) => {
     // Get the existing form
     const existingForm = generatedForms.get(formId);
     if (!existingForm) {
-      const error: ErrorResponse = { error: 'Form not found' };
+      const error: ErrorResponse = { error: "Form not found" };
       return res.status(404).json(error);
     }
 
     console.log(`Processing feedback edit for form ${formId}:`);
-    console.log(`- Page-specific feedback: ${feedbackRequest.pageSpecificFeedback?.length || 0} pages`);
-    console.log(`- General feedback: ${feedbackRequest.generalFeedback ? 'Yes' : 'No'}`);
+    console.log(
+      `- Page-specific feedback: ${
+        feedbackRequest.pageSpecificFeedback?.length || 0
+      } pages`
+    );
+    console.log(
+      `- General feedback: ${feedbackRequest.generalFeedback ? "Yes" : "No"}`
+    );
 
     // Track what pages are being modified for response
     const modifications = {
-      pagesModified: feedbackRequest.pageSpecificFeedback?.map((f: any) => f.pageId) || [],
+      pagesModified:
+        feedbackRequest.pageSpecificFeedback?.map((f: any) => f.pageId) || [],
       pagesAdded: [] as string[],
       pagesRemoved: [] as string[],
-      generalChanges: feedbackRequest.generalFeedback ? [feedbackRequest.generalFeedback] : []
+      generalChanges: feedbackRequest.generalFeedback
+        ? [feedbackRequest.generalFeedback]
+        : [],
     };
 
     // Apply feedback-based edits
-    const editedForm = await aiService.editFormWithFeedback(existingForm, feedbackRequest);
-    
+    const editedForm = await aiService.editFormWithFeedback(
+      existingForm,
+      feedbackRequest
+    );
+
     // Detect new/removed pages
-    const originalPageIds = new Set(existingForm.pages.map(p => p.id));
-    const newPageIds = new Set(editedForm.pages.map(p => p.id));
-    
+    const originalPageIds = new Set(existingForm.pages.map((p) => p.id));
+    const newPageIds = new Set(editedForm.pages.map((p) => p.id));
+
     modifications.pagesAdded = editedForm.pages
-      .filter(p => !originalPageIds.has(p.id))
-      .map(p => p.id);
-      
+      .filter((p) => !originalPageIds.has(p.id))
+      .map((p) => p.id);
+
     modifications.pagesRemoved = existingForm.pages
-      .filter(p => !newPageIds.has(p.id))
-      .map(p => p.id);
+      .filter((p) => !newPageIds.has(p.id))
+      .map((p) => p.id);
 
     // Update the cached form
     generatedForms.set(editedForm.id, editedForm);
 
     const response: FeedbackEditResponse = {
       success: true,
-      message: 'Form updated successfully based on feedback',
+      message: "Form updated successfully based on feedback",
       editedForm,
-      modifications
+      modifications,
     };
 
     console.log(`✅ Feedback edit completed: ${editedForm.id}`);
     console.log(`   Modified pages: ${modifications.pagesModified.length}`);
     console.log(`   Added pages: ${modifications.pagesAdded.length}`);
     console.log(`   Removed pages: ${modifications.pagesRemoved.length}`);
-    
+
     res.json(response);
-    
   } catch (error) {
-    console.error('Feedback edit error:', error);
-    const errorResponse: ErrorResponse = { 
-      error: 'Failed to process feedback edit',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error("Feedback edit error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to process feedback edit",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// PUT: Save manually edited form (replace existing form)
+app.put("/api/forms/:id/save", (req, res) => {
+  try {
+    const formId = req.params.id;
+    const updatedForm: FormDefinition = req.body;
+
+    // Check if form exists
+    const existingForm = generatedForms.get(formId);
+    if (!existingForm) {
+      const error: ErrorResponse = { error: "Form not found" };
+      return res.status(404).json(error);
+    }
+
+    // Basic validation - just ensure we have required fields
+    if (
+      !updatedForm.name ||
+      !updatedForm.pages ||
+      !Array.isArray(updatedForm.pages)
+    ) {
+      const error: ErrorResponse = {
+        error: "Invalid form data",
+        details: "Form must have name and pages array",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log(`Saving manually edited form: ${formId}`);
+    console.log(`- Pages: ${updatedForm.pages.length}`);
+    console.log(`- Name: ${updatedForm.name}`);
+
+    // Simple replace - keep the form exactly as provided, just preserve essential metadata
+    const savedForm: FormDefinition = {
+      ...updatedForm,
+      id: formId, // Ensure ID matches URL
+      createdAt: existingForm.createdAt, // Preserve original creation time
+      lastEditedAt: new Date().toISOString(), // Update last edited time
+      generatedFrom: existingForm.generatedFrom, // Preserve original intent
+    };
+
+    // Replace the old form with the new one
+    generatedForms.set(formId, savedForm);
+
+    console.log(`✅ Form saved: ${formId}`);
+
+    res.json({
+      success: true,
+      message: "Form saved successfully",
+      form: savedForm,
+    });
+  } catch (error) {
+    console.error("Form save error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to save form",
+      details: error instanceof Error ? error.message : "Unknown error",
     };
     res.status(500).json(errorResponse);
   }
