@@ -193,6 +193,8 @@ CRITICAL: Before finalizing the form, verify that:
 2. No page is referenced but missing from the form
 3. All mixed page options have appropriate input types
 4. The routing creates a complete, navigable experience
+5. GENERATE ALL MISSING PAGES - if any routeTo points to a non-existent page, CREATE that page
+6. Every page MUST have a "label" (detailed description of the page) 
 
 RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
   }
@@ -201,7 +203,6 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     return pages.map((page, pageIndex) => {
       // Add text content to every page - text should equal the label (which is the title)
       page.text = page.label || "";
-
       // Check if this should be display-only (only for final pages)
       const isFinalPage = pageIndex >= pages.length - 2; // Last or second-to-last page
       const looksLikeFinalPage =
@@ -503,10 +504,56 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     const validPageIds = new Set(pages.map((page) => page.id));
     console.log("Valid page IDs:", Array.from(validPageIds));
 
+    // Collect all referenced page IDs
+    const referencedPageIds = new Set<string>();
+
+    pages.forEach((page) => {
+      // Collect from single-choice options
+      if (page.inputType === "single-choice" && page.options) {
+        page.options.forEach((opt: any) => {
+          if (opt.routeTo) {
+            referencedPageIds.add(opt.routeTo);
+          }
+        });
+      }
+
+      // Collect from routeButtons
+      if (page.routeButton?.routeTo) {
+        referencedPageIds.add(page.routeButton.routeTo);
+      }
+    });
+
+    // Find missing pages that are referenced but don't exist
+    const missingPageIds = Array.from(referencedPageIds).filter(
+      (pageId) => !validPageIds.has(pageId)
+    );
+
+    if (missingPageIds.length > 0) {
+      console.log(
+        `❌ Found ${missingPageIds.length} missing pages:`,
+        missingPageIds
+      );
+
+      // Create placeholder pages for missing references
+      const placeholderPages = missingPageIds.map((pageId) =>
+        this.createPlaceholderPage(pageId)
+      );
+
+      // Add placeholder pages to the form
+      pages = [...pages, ...placeholderPages];
+
+      // Update valid page IDs set
+      placeholderPages.forEach((page) => validPageIds.add(page.id));
+
+      console.log(
+        `🔧 Created ${placeholderPages.length} placeholder pages to fix routing`
+      );
+    }
+
     // Track broken routes for fixing
     const brokenRoutes: Array<{ pageId: string; routeTo: string }> = [];
 
-    // Check all routing references
+    // Check all routing references again
     pages.forEach((page) => {
       // Check single-choice option routing
       if (page.inputType === "single-choice" && page.options) {
@@ -533,16 +580,17 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
       }
     });
 
-    // Fix broken routes
+    // Fix any remaining broken routes
     if (brokenRoutes.length > 0) {
-      console.log(`🔧 Fixing ${brokenRoutes.length} broken routes...`);
+      console.log(
+        `🔧 Fixing ${brokenRoutes.length} remaining broken routes...`
+      );
 
       pages = pages.map((page) => {
         // Fix single-choice options
         if (page.inputType === "single-choice" && page.options) {
           page.options = page.options.map((opt: any) => {
             if (opt.routeTo && !validPageIds.has(opt.routeTo)) {
-              // Find the best replacement route
               const newRoute = this.findBestReplacement(
                 opt.routeTo,
                 validPageIds,
@@ -579,6 +627,54 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
 
     console.log("✅ Routing validation complete");
     return pages;
+  }
+
+  // NEW METHOD: Create placeholder page for missing references
+  private createPlaceholderPage(pageId: string): any {
+    // Extract meaningful name from page ID
+    const pageName = pageId.replace("page-", "").replace(/-/g, " ");
+    const formattedName = pageName.charAt(0).toUpperCase() + pageName.slice(1);
+
+    return {
+      id: pageId,
+      title: `${formattedName} Details`,
+      label: `${formattedName} Details`,
+      text: `${formattedName} Details`,
+      inputType: "mixed",
+      options: [
+        {
+          id: `opt-${Date.now()}-1`,
+          type: "textarea",
+          label: `Please describe the ${pageName} situation`,
+          value: "",
+          required: true,
+        },
+        {
+          id: `opt-${Date.now()}-2`,
+          type: "toggle",
+          label: "I need additional assistance with this issue",
+          value: "need-assistance",
+        },
+      ],
+      routeButton: {
+        label: "Continue",
+        routeTo: this.findDefaultEndPage() || "page-final-resolution",
+      },
+    };
+  }
+
+  // NEW METHOD: Find a suitable end page for routing
+  private findDefaultEndPage(): string | null {
+    // Look for common end page patterns
+    const commonEndPages = [
+      "page-resolution",
+      "page-final",
+      "page-completion",
+      "page-summary",
+      "page-end",
+    ];
+
+    return commonEndPages[0]; // Default to page-resolution
   }
 
   // NEW METHOD: Find best replacement for broken route
