@@ -157,6 +157,7 @@ CRITICAL STRUCTURE RULES:
    - Each option MUST have: id, type, label, value (empty string "" for text inputs), required (for text)
    - SUPPORTED INPUT TYPES: "text", "email", "tel", "date", "number", "textarea", "toggle", "radio", "select"
    - Text input: { "id": "opt-1", "type": "text", "label": "Date of incident", "value": "", "required": true }
+   - VALIDATION REQUIRED: For ALL input fields, add inputType and validation config
    - Email input: { "id": "opt-2", "type": "email", "label": "Email address", "value": "", "required": true }
    - Phone input: { "id": "opt-3", "type": "tel", "label": "Phone number", "value": "", "required": true }
    - Date input: { "id": "opt-4", "type": "date", "label": "Date of birth", "value": "", "required": true }
@@ -1045,6 +1046,33 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
 - MIXED PAGE INPUT TYPES: text, email, tel, date, number, textarea, toggle, radio, select
 - For display-only: options have id, type:"display", label, value
 - Create ALL pages that are referenced in routing
+
+VALIDATION CONFIGURATION REQUIREMENTS:
+For EVERY input field in mixed pages, you MUST include both inputType and validation:
+
+Example with validation:
+{
+  "id": "full-name",
+  "type": "text",
+  "label": "Full Name",
+  "value": "",
+  "required": true,
+  "inputType": "text",
+  "validation": {
+    "required": true,
+    "minLength": 2,
+    "maxLength": 50,
+    "customPatterns": { "name": true }
+  }
+}
+
+Common validation patterns:
+- Names: inputType="text", validation: {required: true, customPatterns: {name: true}}
+- Email: inputType="email", validation: {required: true}
+- Phone: inputType="phone", validation: {required: true, phoneFormat: "us"}
+- Dates: inputType="date", validation: {required: true, pastOnly: true}
+- Numbers: inputType="number", validation: {min: 0, max: 120}
+- ZIP codes: inputType="text", validation: {required: true, customPatterns: {zipCode: true}}
 
 RESPOND ONLY WITH VALID JSON.`;
 

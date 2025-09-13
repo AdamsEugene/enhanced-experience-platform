@@ -27,6 +27,9 @@ export interface PageOption {
   routeTo?: string;
   required?: boolean;
   selectOptions?: SelectOption[];
+  // Validation configuration for this input
+  inputType?: InputType; // The actual HTML input type for validation
+  validation?: ValidationConfig; // Validation rules for this input
 }
 
 export interface SelectOption {
