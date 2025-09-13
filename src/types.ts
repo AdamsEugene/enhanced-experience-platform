@@ -174,3 +174,94 @@ export interface FeedbackEditResponse {
     generalChanges: string[];
   };
 }
+
+// ============== VALIDATION TYPES ==============
+
+export type InputType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "email"
+  | "password"
+  | "tel"
+  | "phone"
+  | "url"
+  | "date"
+  | "time"
+  | "datetime-local"
+  | "month"
+  | "week"
+  | "color"
+  | "range"
+  | "search"
+  | "file"
+  | "hidden"
+  | "select"
+  | "radio"
+  | "checkbox"
+  | "toggle"
+  | "display";
+
+export interface ValidationConfig {
+  // Common validation rules
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+
+  // Number-specific rules
+  min?: number;
+  max?: number;
+  step?: number;
+
+  // Pattern validation
+  pattern?: string; // Regex pattern
+  customPatterns?: {
+    name?: boolean; // Validate as person name
+    address?: boolean; // Validate as address
+    zipCode?: boolean; // Validate as zip/postal code
+    ssn?: boolean; // Validate as SSN (format: XXX-XX-XXXX)
+    creditCard?: boolean; // Validate as credit card number
+  };
+
+  // Date/time validation
+  minDate?: string; // ISO date string
+  maxDate?: string; // ISO date string
+  futureOnly?: boolean; // Only allow future dates
+  pastOnly?: boolean; // Only allow past dates
+
+  // File validation
+  allowedFileTypes?: string[]; // ['image/*', '.pdf', '.doc', etc.]
+  maxFileSize?: number; // In bytes
+
+  // Select/radio/checkbox validation
+  allowedValues?: string[]; // Valid option values
+  minSelections?: number; // For multi-select/checkbox
+  maxSelections?: number; // For multi-select/checkbox
+
+  // Phone validation
+  phoneFormat?: "us" | "international" | "any";
+
+  // Custom validation messages
+  messages?: {
+    required?: string;
+    invalid?: string;
+    tooShort?: string;
+    tooLong?: string;
+    outOfRange?: string;
+    invalidFormat?: string;
+  };
+}
+
+export interface ValidationRequest {
+  value: any; // The user input value
+  inputType: InputType;
+  config?: ValidationConfig;
+  fieldName?: string; // For better error messages
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings?: string[];
+  sanitizedValue?: any; // Cleaned/formatted value if applicable
+}
