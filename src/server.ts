@@ -10,8 +10,11 @@ import {
   ErrorResponse,
   FeedbackEditResponse,
   FeedbackEditRequest,
+  ValidationRequest,
+  ValidationResult,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
+import { ValidationService } from "./services/validationService";
 
 // Load environment variables
 dotenv.config();
@@ -395,6 +398,122 @@ app.post("/api/forms/:id/submit", async (req, res) => {
   }
 });
 
+// ============== VALIDATION ENDPOINTS ==============
+
+// Validate single input
+app.post("/api/validate", (req, res) => {
+  try {
+    const validationRequest: ValidationRequest = req.body;
+
+    // Validate request structure
+    if (!validationRequest.inputType || validationRequest.value === undefined) {
+      const error: ErrorResponse = {
+        error: "Invalid validation request",
+        details: "inputType and value are required",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log(`Validating ${validationRequest.inputType} input:`, {
+      fieldName: validationRequest.fieldName || "unknown",
+      hasConfig: !!validationRequest.config,
+      valueType: typeof validationRequest.value,
+    });
+
+    // Perform validation
+    const result = ValidationService.validateInput(
+      validationRequest.value,
+      validationRequest.inputType,
+      validationRequest.config || {},
+      validationRequest.fieldName
+    );
+
+    console.log(
+      `Validation result: ${result.isValid ? "✅ Valid" : "❌ Invalid"}`
+    );
+    if (!result.isValid) {
+      console.log(`Errors: ${result.errors.join(", ")}`);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Validation error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to validate input",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Validate multiple inputs (batch validation)
+app.post("/api/validate/batch", (req, res) => {
+  try {
+    const { validations } = req.body;
+
+    if (!validations || !Array.isArray(validations)) {
+      const error: ErrorResponse = {
+        error: "Invalid batch validation request",
+        details: "validations must be an array of ValidationRequest objects",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log(`Batch validating ${validations.length} inputs`);
+
+    const results: { [key: string]: ValidationResult } = {};
+    let allValid = true;
+
+    validations.forEach((validation: ValidationRequest, index: number) => {
+      const key = validation.fieldName || `field_${index}`;
+
+      if (!validation.inputType || validation.value === undefined) {
+        results[key] = {
+          isValid: false,
+          errors: ["inputType and value are required"],
+        };
+        allValid = false;
+        return;
+      }
+
+      const result = ValidationService.validateInput(
+        validation.value,
+        validation.inputType,
+        validation.config || {},
+        validation.fieldName
+      );
+
+      results[key] = result;
+      if (!result.isValid) {
+        allValid = false;
+      }
+    });
+
+    console.log(
+      `Batch validation complete: ${
+        allValid ? "✅ All valid" : "❌ Some invalid"
+      }`
+    );
+
+    res.json({
+      allValid,
+      results,
+      summary: {
+        total: validations.length,
+        valid: Object.values(results).filter((r) => r.isValid).length,
+        invalid: Object.values(results).filter((r) => !r.isValid).length,
+      },
+    });
+  } catch (error) {
+    console.error("Batch validation error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to validate inputs",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
 // Get all generated forms (for debugging/admin)
 app.get("/api/forms", (req, res) => {
   const forms = Array.from(generatedForms.values()).map((form) => ({
@@ -652,4 +771,6 @@ app.listen(PORT, () => {
   console.log(`  POST   /api/forms/delete-batch    - Batch delete forms`);
   console.log(`  POST   /api/forms/:id/submit      - Submit form response`);
   console.log(`  GET    /api/forms/:id/submissions - Get form submissions`);
+  console.log(`  POST   /api/validate              - Validate single input`);
+  console.log(`  POST   /api/validate/batch        - Validate multiple inputs`);
 });
