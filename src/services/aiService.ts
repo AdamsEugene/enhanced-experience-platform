@@ -76,6 +76,7 @@ export class OpenAIService implements AIService {
           createdAt: new Date().toISOString(),
           generatedFrom: userIntent,
           pages: formJson.pages || [],
+          pageLayout: formJson.pageLayout || this.getDefaultPageLayouts(),
           ...formJson, // Allow override but ensure required fields exist
         };
 
@@ -139,20 +140,20 @@ PAGE ID NAMING CONVENTION (CRITICAL):
 
 CRITICAL STRUCTURE RULES:
 
-1. "single-choice" pages: 
+1. "single-choice" pages:
    - Options MUST have: id, label, value (the actual value), routeTo (page-[something])
    - NO routeButton needed
    - EVERY routeTo MUST point to an EXISTING page in the form
    Example option: { "id": "opt-1", "label": "Vehicle collision", "value": "collision", "routeTo": "page-2" }
 
-2. "multi-choice" pages: 
+2. "multi-choice" pages:
    - Options MUST have: id, label, value (the actual value)
    - NO routeTo in options
    - Page MUST have routeButton with label and routeTo pointing to EXISTING page
    Example option: { "id": "opt-1", "label": "Police report filed", "value": "police-report" }
    Example routeButton: { "label": "Continue", "routeTo": "page-5" }
 
-3. "mixed" pages: 
+3. "mixed" pages:
    - Options array contains ALL inputs (text, toggle, etc.)
    - Each option MUST have: id, type, label, value (empty string "" for text inputs), required (for text)
    - SUPPORTED INPUT TYPES: "text", "email", "tel", "date", "number", "textarea", "toggle", "radio", "select"
@@ -163,12 +164,39 @@ CRITICAL STRUCTURE RULES:
    - Date input: { "id": "opt-4", "type": "date", "label": "Date of birth", "value": "", "required": true }
    - Number input: { "id": "opt-5", "type": "number", "label": "Age", "value": "", "required": false }
    - Textarea: { "id": "opt-6", "type": "textarea", "label": "Describe what happened", "value": "", "required": true }
+
+VALIDATION CONFIGURATION REQUIREMENTS:
+For EVERY input field in mixed pages, you MUST include both inputType and validation:
+
+Example with validation:
+{
+  "id": "full-name",
+  "type": "text",
+  "label": "Full Name",
+  "value": "",
+  "required": true,
+  "inputType": "text",
+  "validation": {
+    "required": true,
+    "minLength": 2,
+    "maxLength": 50,
+    "customPatterns": { "name": true }
+  }
+}
+
+Common validation patterns:
+- Names: inputType="text", validation: {required: true, customPatterns: {name: true}}
+- Email: inputType="email", validation: {required: true}
+- Phone: inputType="phone", validation: {required: true, phoneFormat: "us"}
+- Dates: inputType="date", validation: {required: true, pastOnly: true}
+- Numbers: inputType="number", validation: {min: 0, max: 120}
+- ZIP codes: inputType="text", validation: {required: true, customPatterns: {zipCode: true}}
    - Toggle: { "id": "opt-7", "type": "toggle", "label": "Police involved", "value": "police-involved" }
    - Radio: { "id": "opt-8", "type": "radio", "label": "Severity level", "value": "severity", "selectOptions": [{"label": "Minor", "value": "minor"}, {"label": "Major", "value": "major"}] }
    - Select: { "id": "opt-9", "type": "select", "label": "State", "value": "", "selectOptions": [{"label": "California", "value": "CA"}, {"label": "Texas", "value": "TX"}] }
    - Page MUST have routeButton pointing to EXISTING page
-   
-4. "display-only" pages: 
+
+4. "display-only" pages:
    - ONLY USE FOR FINAL SUCCESS/COMPLETION PAGES (last 1-2 pages)
    - Each option: { "id": "info-1", "type": "display", "label": "Field Name", "value": "field-value" }
 
@@ -199,6 +227,48 @@ CRITICAL: Before finalizing the form, verify that:
 5. GENERATE ALL MISSING PAGES - if any routeTo points to a non-existent page, CREATE that page
 6. Every page MUST have a "label" (detailed description of the page) 
 
+LAYOUT STYLING REQUIREMENTS:
+The form MUST include pageLayout at the TOP LEVEL with 3 Tailwind CSS layout options for ALL pages:
+- pageLayout: ["layout1-classes", "layout2-classes", "layout3-classes"]
+
+For EVERY page with input fields (mixed pages), you MUST include formLayout with 3 Tailwind CSS form layout options:
+- formLayout: ["form1-classes", "form2-classes", "form3-classes"]
+
+Example form structure with layouts:
+{
+  "name": "Contact Form",
+  "description": "...",
+  "pageLayout": [
+    "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4",
+    "min-h-screen bg-white flex flex-col items-center justify-start pt-12 px-4",
+    "min-h-screen bg-gray-50 grid place-items-center p-6"
+  ],
+  "pages": [
+    {
+      "id": "page-contact-info",
+      "title": "Contact Information",
+      "inputType": "mixed",
+      "formLayout": [
+        "max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6",
+        "w-full max-w-2xl bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-4",
+        "max-w-lg mx-auto bg-gradient-to-r from-white to-gray-50 rounded-2xl shadow-xl p-10 space-y-8"
+      ],
+      "options": [...],
+      "routeButton": {...}
+    }
+  ]
+}
+
+Common page layout patterns:
+- Centered: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+- Top-aligned: "min-h-screen bg-white flex flex-col items-center justify-start pt-12 px-4"
+- Grid-centered: "min-h-screen bg-gray-50 grid place-items-center p-6"
+
+Common form layout patterns:
+- Compact card: "max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6"
+- Two-column: "w-full max-w-2xl bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+- Spacious card: "max-w-lg mx-auto bg-gradient-to-r from-white to-gray-50 rounded-2xl shadow-xl p-10 space-y-8"
+
 RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
   }
 
@@ -206,6 +276,21 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     return pages.map((page, pageIndex) => {
       // Add text content to every page - text should equal the label (which is the title)
       page.text = page.label || "";
+
+      // Remove pageLayout from individual pages (it should be at form level now)
+      if (page.pageLayout) {
+        delete page.pageLayout;
+      }
+
+      // Add default form layout classes for mixed pages if missing
+      if (
+        page.inputType === "mixed" &&
+        (!page.formLayout ||
+          !Array.isArray(page.formLayout) ||
+          page.formLayout.length < 3)
+      ) {
+        page.formLayout = this.getDefaultFormLayouts();
+      }
       // Check if this should be display-only (only for final pages)
       const isFinalPage = pageIndex >= pages.length - 2; // Last or second-to-last page
       const looksLikeFinalPage =
@@ -455,6 +540,24 @@ RESPOND ONLY WITH VALID JSON containing name, description, and pages fields.`;
     return ["text", "email", "tel", "date", "number", "textarea"].includes(
       type
     );
+  }
+
+  // NEW METHOD: Get default page layout classes
+  private getDefaultPageLayouts(): string[] {
+    return [
+      "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4",
+      "min-h-screen bg-white flex flex-col items-center justify-start pt-12 px-4",
+      "min-h-screen bg-gray-50 grid place-items-center p-6",
+    ];
+  }
+
+  // NEW METHOD: Get default form layout classes
+  private getDefaultFormLayouts(): string[] {
+    return [
+      "max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6",
+      "w-full max-w-2xl bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-4",
+      "max-w-lg mx-auto bg-gradient-to-r from-white to-gray-50 rounded-2xl shadow-xl p-10 space-y-8",
+    ];
   }
 
   // NEW METHOD: Generate default options for radio/select inputs
@@ -1073,6 +1176,23 @@ Common validation patterns:
 - Dates: inputType="date", validation: {required: true, pastOnly: true}
 - Numbers: inputType="number", validation: {min: 0, max: 120}
 - ZIP codes: inputType="text", validation: {required: true, customPatterns: {zipCode: true}}
+
+LAYOUT STYLING REQUIREMENTS:
+The form MUST include pageLayout at the TOP LEVEL with 3 Tailwind CSS layout options for ALL pages:
+- pageLayout: ["layout1-classes", "layout2-classes", "layout3-classes"]
+
+For EVERY page with input fields (mixed pages), you MUST include formLayout with 3 Tailwind CSS form layout options:
+- formLayout: ["form1-classes", "form2-classes", "form3-classes"]
+
+Common page layout patterns:
+- Centered: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+- Top-aligned: "min-h-screen bg-white flex flex-col items-center justify-start pt-12 px-4"
+- Grid-centered: "min-h-screen bg-gray-50 grid place-items-center p-6"
+
+Common form layout patterns:
+- Compact card: "max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 space-y-6"
+- Two-column: "w-full max-w-2xl bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+- Spacious card: "max-w-lg mx-auto bg-gradient-to-r from-white to-gray-50 rounded-2xl shadow-xl p-10 space-y-8"
 
 RESPOND ONLY WITH VALID JSON.`;
 

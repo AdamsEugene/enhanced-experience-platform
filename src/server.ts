@@ -401,7 +401,7 @@ app.post("/api/forms/:id/submit", async (req, res) => {
 // ============== VALIDATION ENDPOINTS ==============
 
 // Validate single input
-app.post("/api/validate", (req, res) => {
+app.post("/api/forms/validate", (req, res) => {
   try {
     const validationRequest: ValidationRequest = req.body;
 
@@ -447,7 +447,7 @@ app.post("/api/validate", (req, res) => {
 });
 
 // Validate multiple inputs (batch validation)
-app.post("/api/validate/batch", (req, res) => {
+app.post("/api/forms/validate/batch", (req, res) => {
   try {
     const { validations } = req.body;
 
