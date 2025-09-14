@@ -78,6 +78,11 @@ app.use(
       "X-Requested-With",
       "Accept",
       "Origin",
+      "Cache-Control",
+      "Pragma",
+      "Expires",
+      "If-Modified-Since",
+      "If-None-Match",
     ],
   })
 );
