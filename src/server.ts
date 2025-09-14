@@ -119,6 +119,40 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Generate loading messages for user while form is being created
+app.post("/api/forms/loading-messages", async (req, res) => {
+  try {
+    const { userIntent }: { userIntent: string } = req.body;
+
+    if (
+      !userIntent ||
+      typeof userIntent !== "string" ||
+      userIntent.trim().length === 0
+    ) {
+      const error: ErrorResponse = {
+        error: "userIntent is required and must be a non-empty string",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log("Generating loading messages for intent:", userIntent);
+
+    const messages = await aiService.generateLoadingMessages(userIntent.trim());
+
+    console.log(
+      `Loading messages generated successfully: ${messages.length} messages`
+    );
+    res.json({ messages });
+  } catch (error) {
+    console.error("Loading messages generation error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to generate loading messages",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
 // Generate form from user intent
 app.post("/api/forms/generate", async (req, res) => {
   try {
@@ -819,6 +853,9 @@ app.listen(PORT, () => {
     }`
   );
   console.log(`\n📝 Available endpoints:`);
+  console.log(
+    `  POST   /api/forms/loading-messages - Generate loading messages`
+  );
   console.log(`  POST   /api/forms/generate        - Generate new form`);
   console.log(`  GET    /api/forms                 - List all forms`);
   console.log(`  GET    /api/forms/:id             - Get specific form`);

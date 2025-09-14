@@ -15,6 +15,7 @@ export interface AIService {
     createNew?: boolean
   ): Promise<FormDefinition>;
   processFormSubmission(formId: string, responses: any): Promise<AIAnalysis>;
+  generateLoadingMessages(userIntent: string): Promise<string[]>;
 }
 
 export class OpenAIService implements AIService {
@@ -1252,6 +1253,80 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
   ): Promise<FormDefinition> {
     // Implementation similar to regenerateEntireForm
     return this.regenerateEntireForm(existingForm, editRequest);
+  }
+
+  // ============== LOADING MESSAGES GENERATION ==============
+
+  async generateLoadingMessages(userIntent: string): Promise<string[]> {
+    try {
+      console.log(`🔄 Generating loading messages for: "${userIntent}"`);
+
+      const prompt = this.buildLoadingMessagesPrompt(userIntent);
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-3.5-turbo", // Using faster model for quick response
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that generates encouraging loading messages. Respond only with a JSON array of exactly 6 short, positive messages.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI for loading messages");
+      }
+
+      // Parse the JSON array
+      const messages = JSON.parse(content.trim());
+
+      if (Array.isArray(messages) && messages.length > 0) {
+        console.log(`✅ Generated ${messages.length} loading messages`);
+        return messages;
+      } else {
+        throw new Error("Invalid response format for loading messages");
+      }
+    } catch (error) {
+      console.error("❌ Failed to generate loading messages:", error);
+      // Return fallback messages if AI fails
+      return this.getFallbackLoadingMessages(userIntent);
+    }
+  }
+
+  private buildLoadingMessagesPrompt(userIntent: string): string {
+    return `Generate exactly 6 short, encouraging loading messages (each 10-15 words) for someone creating a form about: "${userIntent}"
+
+The messages should:
+- Be positive and encouraging
+- Reference the specific form being created
+- Show progress and anticipation
+- Be professional but friendly
+
+Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "message 4", "message 5", "message 6"]`;
+  }
+
+  private getFallbackLoadingMessages(userIntent: string): string[] {
+    const genericMessages = [
+      "Analyzing your requirements...",
+      "Creating the perfect form structure...",
+      "Adding smart validation rules...",
+      "Optimizing the user experience...",
+      "Finalizing your custom form...",
+      "Almost ready! Putting the finishing touches...",
+    ];
+
+    // Try to customize at least the first message based on user intent
+    const customizedFirst = `Creating your ${userIntent.toLowerCase()} form...`;
+
+    return [customizedFirst, ...genericMessages.slice(1)];
   }
 
   private buildFeedbackEditPrompt(
