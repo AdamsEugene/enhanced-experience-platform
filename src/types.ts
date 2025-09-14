@@ -7,6 +7,10 @@ export interface FormDefinition {
   generatedFrom?: string;
   lastEditedAt?: string; // Track when form was last edited
   editHistory?: EditHistoryEntry[]; // Optional edit history
+  styles?: {
+    container?: string;
+    [selector: string]: string | undefined; // CSS selectors (.class, #id, tag) with Tailwind classes
+  };
 }
 
 export interface FormPage {
@@ -22,6 +26,10 @@ export interface FormPage {
     form?: string;
     [key: string]: string | undefined;
   };
+  className?: string; // CSS class name for this page
+  containerClass?: string; // CSS class for page container
+  headerClass?: string; // CSS class for page header
+  formClass?: string; // CSS class for form element
 }
 
 export interface PageOption {
@@ -35,6 +43,9 @@ export interface PageOption {
   // Validation configuration for this input
   inputType?: InputType; // The actual HTML input type for validation
   validation?: ValidationConfig; // Validation rules for this input
+  className?: string; // CSS class name for this option
+  labelClass?: string; // CSS class for the label
+  inputClass?: string; // CSS class for the input element
 }
 
 export interface SelectOption {

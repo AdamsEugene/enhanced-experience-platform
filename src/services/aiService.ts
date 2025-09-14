@@ -1354,17 +1354,56 @@ Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "me
         messages: [
           {
             role: "system",
-            content: `You are a Tailwind CSS expert specializing in form styling. You apply specific styling changes to forms based on user feedback while maintaining functionality and accessibility.
-            
+            content: `You are a Tailwind CSS expert. You MUST modify the form JSON to include a "styles" object with CSS classes AND add class names to elements so the frontend knows where to apply them.
+
+MANDATORY REQUIREMENTS:
+1. ALWAYS include a "styles" object at the root level with CSS selectors and classes
+2. ADD class name fields to pages and options that reference the styles
+3. Use semantic class names like "page-header", "form-container", "input-field"
+
+APPROACH:
+A) "styles" object: Contains CSS selectors (.class, #id, tag) and their Tailwind classes
+B) Class name fields: Added to elements to reference which styles apply to them
+
+EXAMPLE RESPONSE FORMAT:
+{
+  "id": "form-123",
+  "name": "Form Name",
+  "pages": [
+    {
+      "id": "page-1",
+      "label": "Contact Info",
+      "containerClass": "page-container",
+      "headerClass": "page-header", 
+      "formClass": "form-container",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "Name",
+          "labelClass": "field-label",
+          "inputClass": "input-field"
+        }
+      ]
+    }
+  ],
+  "styles": {
+    "container": "bg-gray-100 p-8",
+    ".page-header": "text-2xl font-bold mb-4",
+    ".page-container": "bg-white p-6 rounded-lg shadow-md",
+    ".form-container": "space-y-4",
+    ".field-label": "block text-sm font-medium text-gray-700",
+    ".input-field": "w-full p-3 border border-gray-300 rounded-md",
+    "#page-1": "bg-blue-50",
+    "h1": "text-3xl font-serif"
+  }
+}
+
 CRITICAL RULES:
-- Return the COMPLETE modified form JSON (all pages, even unchanged ones)
-- Apply styling changes ONLY where requested
-- Use modern, responsive Tailwind CSS classes
-- Maintain form functionality and validation
-- Focus on visual improvements without breaking structure
-- ALWAYS respond with valid, complete JSON only - no explanations, no markdown, no text outside the JSON
-- Ensure all JSON objects are properly closed with matching braces
-- Do not truncate the response - include the complete form structure`,
+- ALWAYS include the "styles" object with CSS selectors and Tailwind classes
+- ADD class name fields (containerClass, headerClass, formClass, labelClass, inputClass) to elements
+- Use semantic class names that match the styles object
+- Apply styling changes based on user feedback
+- The frontend will use the class name fields to know which styles to apply`,
           },
           {
             role: "user",
@@ -1402,6 +1441,11 @@ CRITICAL RULES:
         name: formJson.name || existingForm.name,
         description: formJson.description || existingForm.description,
         pages: this.ensurePageIdFormat(formJson.pages || existingForm.pages),
+        styles: formJson.styles ||
+          existingForm.styles || {
+            container: "p-4",
+            ".form-container": "space-y-4",
+          }, // Ensure styles always exist
         lastEditedAt: new Date().toISOString(),
       };
 
@@ -1425,7 +1469,7 @@ CRITICAL RULES:
     existingForm: FormDefinition,
     stylingRequest: StylingRequest
   ): string {
-    let prompt = `TASK: Apply Tailwind CSS styling changes to this existing form.
+    let prompt = `TASK: Generate CSS classes and selectors to apply Tailwind CSS styling changes to this existing form.
 
 EXISTING FORM:
 ${JSON.stringify(existingForm, null, 2)}
@@ -1454,42 +1498,68 @@ STYLING CHANGES TO APPLY:
 
     prompt += `
 
-STYLING IMPLEMENTATION GUIDE:
+CLASS NAME ASSIGNMENT APPROACH:
 
-For PAGE-SPECIFIC styling requests:
-- Add appropriate Tailwind classes to the specific page structure
-- Focus on background colors, typography, spacing, positioning
-- Example styling options:
-  * Backgrounds: bg-red-500, bg-gradient-to-r from-blue-500 to-purple-600
-  * Fonts: font-serif, font-bold, text-lg, text-center
-  * Layout: flex, grid, justify-center, items-center
-  * Spacing: p-4, m-8, space-y-4
-  * Borders: border, rounded-lg, shadow-lg
+ASSIGN CLASS NAMES TO ELEMENTS BASED ON STYLING FEEDBACK:
 
-For FORM-SPECIFIC styling:
-- Apply classes to form containers and input areas
-- Consider responsive design: sm:, md:, lg: prefixes
-- Maintain accessibility and usability
+1. **Page-Specific Styling**: Add class name fields to the specific page mentioned in feedback
+   - If feedback mentions "page-1" or "Contact Information", add class names to that page
+   - Use: containerClass, headerClass, formClass
 
-For GENERAL styling:
-- Apply consistent styling across all pages
-- Ensure cohesive design language
-- Consider overall layout positioning
+2. **General Styling**: Add class names to ALL pages and relevant options
+   - If feedback says "all inputs" or "center everything", apply class names to all applicable elements
+   - Use: labelClass, inputClass, className
 
-COMMON STYLING INTERPRETATIONS:
-- "red background" → bg-red-500 or bg-red-100 (lighter for readability)
-- "change font" → font-serif, font-sans, text-lg, font-bold
-- "right side" → justify-end, items-end, ml-auto
-- "center" → justify-center, items-center, text-center
-- "bigger" → text-xl, p-8, w-full
-- "colorful" → bg-gradient-to-r from-purple-400 to-pink-400
+3. **Element Mapping**:
+   - Page background → page.containerClass = "page-container"
+   - Page title/header → page.headerClass = "page-header"  
+   - Form styling → page.formClass = "form-container"
+   - Input styling → option.inputClass = "input-field"
+   - Label styling → option.labelClass = "field-label"
+
+4. **Semantic Class Names**:
+   - Use descriptive names: "page-header", "form-container", "input-field", "submit-button"
+   - Match class names in the styles object: .page-header, .form-container, .input-field
+
+REQUIRED JSON STRUCTURE:
+You MUST add a "styles" object at the root level of the form JSON containing CSS classes:
+
+EXAMPLE OUTPUT STRUCTURE:
+{
+  "id": "form-123",
+  "name": "Contact Form",
+  "description": "...",
+  "pages": [...],
+  "styles": {
+    "container": "bg-gradient-to-r from-blue-500 to-purple-600 p-8",
+    ".page-header": "text-white text-2xl font-bold mb-4",
+    ".form-container": "bg-white rounded-lg shadow-lg p-6",
+    ".input-field": "w-full p-3 border border-gray-300 rounded-md",
+    ".submit-button": "bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600",
+    "#page-1": "special-styling-for-page-1",
+    "h1": "text-3xl font-serif",
+    "form": "space-y-4"
+  },
+  "createdAt": "...",
+  "lastEditedAt": "..."
+}
+
+MANDATORY: The "styles" object is REQUIRED in every response.
+
+COMMON STYLING PATTERNS:
+- Background changes: "container": "bg-red-500" or "bg-gradient-to-r from-blue-400 to-purple-600"
+- Font changes: "h1": "font-serif text-xl" or ".page-title": "font-bold text-2xl"
+- Layout changes: "form": "flex flex-col items-center" or ".form-container": "ml-auto mr-0"
+- Color schemes: ".input-field": "bg-gray-100 border-blue-300"
 
 CRITICAL REQUIREMENTS:
 - Return the COMPLETE form with ALL pages (modified and unmodified)
+- Add a "styles" object containing CSS classes and selectors
+- Use Tailwind CSS utility classes
+- Create semantic, reusable class names
+- Target appropriate HTML elements (h1, h2, form, input, button, etc.)
 - Maintain all existing functionality, validation, and routing
-- Add styling properties/classes appropriately to the form structure
 - Do not change page IDs, option IDs, or routing logic
-- Focus purely on visual enhancements
 
 RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
 
@@ -1542,14 +1612,17 @@ RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
       } catch (secondError) {
         console.error("❌ All JSON repair methods failed:", secondError);
 
-        // Method 3: Return the original form with minimal styling changes
-        console.log("🛡️ Falling back to original form with basic styling");
+        // Method 3: Return the original form with minimal CSS styling
+        console.log("🛡️ Falling back to original form with basic CSS styling");
         return {
           ...fallbackForm,
-          pages: fallbackForm.pages.map((page) => ({
-            ...page,
-            styling: page.styling || { container: "p-4" }, // Add minimal styling
-          })),
+          styles: {
+            container: "p-4 bg-gray-50",
+            ".page-header": "text-lg font-medium mb-4",
+            ".form-container": "space-y-4",
+            ".input-field": "w-full p-2 border border-gray-300 rounded",
+            ...fallbackForm.styles, // Preserve any existing styles
+          },
         };
       }
     }
