@@ -17,6 +17,11 @@ export interface FormPage {
   options: PageOption[];
   routeButton?: RouteButton | null;
   displayContent?: DisplayItem[];
+  styling?: {
+    container?: string;
+    form?: string;
+    [key: string]: string | undefined;
+  };
 }
 
 export interface PageOption {

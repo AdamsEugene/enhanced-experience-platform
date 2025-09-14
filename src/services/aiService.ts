@@ -1362,14 +1362,16 @@ CRITICAL RULES:
 - Use modern, responsive Tailwind CSS classes
 - Maintain form functionality and validation
 - Focus on visual improvements without breaking structure
-- Always respond with valid JSON only`,
+- ALWAYS respond with valid, complete JSON only - no explanations, no markdown, no text outside the JSON
+- Ensure all JSON objects are properly closed with matching braces
+- Do not truncate the response - include the complete form structure`,
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        max_tokens: 4095,
+        max_tokens: 8000, // Increased to handle larger forms
         temperature: 0.1,
       });
 
@@ -1378,10 +1380,22 @@ CRITICAL RULES:
         throw new Error("No content received from OpenAI");
       }
 
-      const formJson = this.extractJSONFromResponse(
-        content,
-        "styling application"
-      );
+      console.log(`📄 AI response length: ${content.length} characters`);
+
+      // Enhanced JSON extraction with retry for styling
+      let formJson;
+      try {
+        formJson = this.extractJSONFromResponse(content, "styling application");
+        console.log("✅ Primary JSON extraction successful");
+      } catch (jsonError) {
+        console.warn(
+          "❌ Primary JSON extraction failed:",
+          jsonError instanceof Error ? jsonError.message : String(jsonError)
+        );
+        console.log("🔧 Response preview:", content.substring(0, 200) + "...");
+        // Try a more aggressive JSON cleaning approach
+        formJson = this.extractAndRepairJSON(content, existingForm);
+      }
 
       const result: FormDefinition = {
         ...existingForm,
@@ -1480,6 +1494,65 @@ CRITICAL REQUIREMENTS:
 RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
 
     return prompt;
+  }
+
+  private extractAndRepairJSON(
+    content: string,
+    fallbackForm: FormDefinition
+  ): any {
+    console.log("🔧 Attempting aggressive JSON repair for styling...");
+
+    try {
+      // Method 1: Try extracting just the JSON part more aggressively
+      let cleaned = content
+        .replace(/```json\n?/gi, "")
+        .replace(/```\n?/gi, "")
+        .replace(/^\s*[\r\n]/gm, "")
+        .trim();
+
+      // Find the JSON object boundaries more carefully
+      const jsonStart = cleaned.indexOf("{");
+      const jsonEnd = cleaned.lastIndexOf("}");
+
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+        // Try parsing the cleaned JSON
+        const parsed = JSON.parse(cleaned);
+        console.log("✅ JSON repair successful - method 1");
+        return parsed;
+      }
+
+      throw new Error("Could not find valid JSON boundaries");
+    } catch (error) {
+      console.warn("🔧 Method 1 failed, trying method 2...");
+
+      try {
+        // Method 2: More aggressive cleaning and repair
+        let repaired = content
+          .replace(/```[\w]*\n?/gi, "") // Remove code block markers
+          .replace(/\n\s*\n/g, "\n") // Remove empty lines
+          .replace(/^[^{]*{/, "{") // Remove everything before first {
+          .replace(/}[^}]*$/, "}") // Remove everything after last }
+          .trim();
+
+        const parsed = JSON.parse(repaired);
+        console.log("✅ JSON repair successful - method 2");
+        return parsed;
+      } catch (secondError) {
+        console.error("❌ All JSON repair methods failed:", secondError);
+
+        // Method 3: Return the original form with minimal styling changes
+        console.log("🛡️ Falling back to original form with basic styling");
+        return {
+          ...fallbackForm,
+          pages: fallbackForm.pages.map((page) => ({
+            ...page,
+            styling: page.styling || { container: "p-4" }, // Add minimal styling
+          })),
+        };
+      }
+    }
   }
 
   private buildFeedbackEditPrompt(
