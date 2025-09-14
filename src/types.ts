@@ -7,8 +7,6 @@ export interface FormDefinition {
   generatedFrom?: string;
   lastEditedAt?: string; // Track when form was last edited
   editHistory?: EditHistoryEntry[]; // Optional edit history
-  // Layout styling options for all pages
-  pageLayout?: string[]; // Array of 3 Tailwind CSS classes for page layout options
 }
 
 export interface FormPage {
@@ -19,8 +17,6 @@ export interface FormPage {
   options: PageOption[];
   routeButton?: RouteButton | null;
   displayContent?: DisplayItem[];
-  // Layout styling options
-  formLayout?: string[]; // Array of 3 Tailwind CSS classes for form layout options (for mixed pages)
 }
 
 export interface PageOption {
