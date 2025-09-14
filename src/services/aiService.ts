@@ -1269,7 +1269,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
           {
             role: "system",
             content:
-              "You are a helpful assistant that generates encouraging loading messages. Respond only with a JSON array of exactly 6 short, positive messages.",
+              "You are a helpful assistant that generates encouraging loading messages. Respond only with a JSON array of exactly 10 short, positive messages.",
           },
           {
             role: "user",
@@ -1302,7 +1302,7 @@ RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR MARKDOWN.
   }
 
   private buildLoadingMessagesPrompt(userIntent: string): string {
-    return `Generate exactly 6 short, encouraging loading messages (each 10-15 words) for someone creating a form about: "${userIntent}"
+    return `Generate exactly 10 short, encouraging loading messages (each 10-15 words) for someone creating a form about: "${userIntent}"
 
 The messages should:
 - Be positive and encouraging
@@ -1310,7 +1310,7 @@ The messages should:
 - Show progress and anticipation
 - Be professional but friendly
 
-Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "message 4", "message 5", "message 6"]`;
+Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "message 4", "message 5", "message 6", "message 7", "message 8", "message 9", "message 10"]`;
   }
 
   private getFallbackLoadingMessages(userIntent: string): string[] {
