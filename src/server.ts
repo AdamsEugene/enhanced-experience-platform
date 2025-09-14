@@ -33,11 +33,17 @@ app.use(
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3007",
+        "http://localhost:4200", // Angular default
+        "http://localhost:4201", // Angular alternative
         "http://localhost:8080",
+        "http://localhost:8081",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3007",
+        "http://127.0.0.1:4200", // Angular default
+        "http://127.0.0.1:4201", // Angular alternative
         "http://127.0.0.1:8080",
+        "http://127.0.0.1:8081",
       ];
 
       // Add custom origin from environment variable if specified
@@ -49,20 +55,30 @@ app.use(
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        // For development, allow all localhost origins
+        // For development, allow all localhost and 127.0.0.1 origins
         if (
           process.env.NODE_ENV !== "production" &&
-          (origin.includes("localhost") || origin.includes("127.0.0.1"))
+          (origin.includes("localhost") ||
+            origin.includes("127.0.0.1") ||
+            origin.includes("0.0.0.0"))
         ) {
+          console.log(`🌐 CORS: Allowing development origin: ${origin}`);
           callback(null, true);
         } else {
+          console.log(`❌ CORS: Blocking origin: ${origin}`);
           callback(new Error("Not allowed by CORS"));
         }
       }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
   })
 );
 app.use(express.json({ limit: "10mb" }));
