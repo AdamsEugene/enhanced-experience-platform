@@ -3,6 +3,8 @@ import {
   AIAnalysis,
   FormEditRequest,
   FeedbackEditRequest,
+  StylingRequest,
+  StylingResponse,
 } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import OpenAI from "openai";
@@ -16,6 +18,10 @@ export interface AIService {
   ): Promise<FormDefinition>;
   processFormSubmission(formId: string, responses: any): Promise<AIAnalysis>;
   generateLoadingMessages(userIntent: string): Promise<string[]>;
+  applyFormStyling(
+    existingForm: FormDefinition,
+    stylingRequest: StylingRequest
+  ): Promise<FormDefinition>;
 }
 
 export class OpenAIService implements AIService {
@@ -1327,6 +1333,153 @@ Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "me
     const customizedFirst = `Creating your ${userIntent.toLowerCase()} form...`;
 
     return [customizedFirst, ...genericMessages.slice(1)];
+  }
+
+  // ============== FORM STYLING METHODS ==============
+
+  async applyFormStyling(
+    existingForm: FormDefinition,
+    stylingRequest: StylingRequest
+  ): Promise<FormDefinition> {
+    try {
+      console.log(
+        "Processing styling request for form:",
+        stylingRequest.formId
+      );
+
+      const prompt = this.buildStylingPrompt(existingForm, stylingRequest);
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a Tailwind CSS expert specializing in form styling. You apply specific styling changes to forms based on user feedback while maintaining functionality and accessibility.
+            
+CRITICAL RULES:
+- Return the COMPLETE modified form JSON (all pages, even unchanged ones)
+- Apply styling changes ONLY where requested
+- Use modern, responsive Tailwind CSS classes
+- Maintain form functionality and validation
+- Focus on visual improvements without breaking structure
+- Always respond with valid JSON only`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 4095,
+        temperature: 0.1,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
+      }
+
+      const formJson = this.extractJSONFromResponse(
+        content,
+        "styling application"
+      );
+
+      const result: FormDefinition = {
+        ...existingForm,
+        name: formJson.name || existingForm.name,
+        description: formJson.description || existingForm.description,
+        pages: this.ensurePageIdFormat(formJson.pages || existingForm.pages),
+        lastEditedAt: new Date().toISOString(),
+      };
+
+      // Apply structure fixes and routing validation
+      result.pages = this.fixPageStructures(result.pages);
+      result.pages = this.validateAndFixRouting(result.pages);
+
+      console.log("✅ Styling applied successfully");
+      return result;
+    } catch (error) {
+      console.error("Error applying form styling:", error);
+      throw new Error(
+        `Failed to apply styling: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  private buildStylingPrompt(
+    existingForm: FormDefinition,
+    stylingRequest: StylingRequest
+  ): string {
+    let prompt = `TASK: Apply Tailwind CSS styling changes to this existing form.
+
+EXISTING FORM:
+${JSON.stringify(existingForm, null, 2)}
+
+STYLING CHANGES TO APPLY:
+`;
+
+    if (
+      stylingRequest.pageSpecificFeedback &&
+      stylingRequest.pageSpecificFeedback.length > 0
+    ) {
+      prompt += `\nPAGE-SPECIFIC STYLING:\n`;
+      stylingRequest.pageSpecificFeedback.forEach((pageStyling) => {
+        prompt += `\nPage ID: ${pageStyling.pageId}\n`;
+        prompt += `Page Title: "${pageStyling.pageTitle}"\n`;
+        prompt += `Styling Requirements:\n`;
+        pageStyling.feedbacks.forEach((feedback, idx) => {
+          prompt += `  ${idx + 1}. ${feedback}\n`;
+        });
+      });
+    }
+
+    if (stylingRequest.generalFeedback) {
+      prompt += `\nGENERAL STYLING:\n${stylingRequest.generalFeedback}\n`;
+    }
+
+    prompt += `
+
+STYLING IMPLEMENTATION GUIDE:
+
+For PAGE-SPECIFIC styling requests:
+- Add appropriate Tailwind classes to the specific page structure
+- Focus on background colors, typography, spacing, positioning
+- Example styling options:
+  * Backgrounds: bg-red-500, bg-gradient-to-r from-blue-500 to-purple-600
+  * Fonts: font-serif, font-bold, text-lg, text-center
+  * Layout: flex, grid, justify-center, items-center
+  * Spacing: p-4, m-8, space-y-4
+  * Borders: border, rounded-lg, shadow-lg
+
+For FORM-SPECIFIC styling:
+- Apply classes to form containers and input areas
+- Consider responsive design: sm:, md:, lg: prefixes
+- Maintain accessibility and usability
+
+For GENERAL styling:
+- Apply consistent styling across all pages
+- Ensure cohesive design language
+- Consider overall layout positioning
+
+COMMON STYLING INTERPRETATIONS:
+- "red background" → bg-red-500 or bg-red-100 (lighter for readability)
+- "change font" → font-serif, font-sans, text-lg, font-bold
+- "right side" → justify-end, items-end, ml-auto
+- "center" → justify-center, items-center, text-center
+- "bigger" → text-xl, p-8, w-full
+- "colorful" → bg-gradient-to-r from-purple-400 to-pink-400
+
+CRITICAL REQUIREMENTS:
+- Return the COMPLETE form with ALL pages (modified and unmodified)
+- Maintain all existing functionality, validation, and routing
+- Add styling properties/classes appropriately to the form structure
+- Do not change page IDs, option IDs, or routing logic
+- Focus purely on visual enhancements
+
+RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
+
+    return prompt;
   }
 
   private buildFeedbackEditPrompt(

@@ -10,6 +10,8 @@ import {
   ErrorResponse,
   FeedbackEditResponse,
   FeedbackEditRequest,
+  StylingRequest,
+  StylingResponse,
   ValidationRequest,
   ValidationResult,
 } from "./types";
@@ -346,6 +348,80 @@ app.put("/api/forms/:id/feedback-edit", async (req, res) => {
     console.error("Feedback edit error:", error);
     const errorResponse: ErrorResponse = {
       error: "Failed to process feedback edit",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Apply styling changes to form based on user feedback
+app.put("/api/forms/:id/styling", async (req, res) => {
+  try {
+    const formId = req.params.id;
+    const stylingRequest: StylingRequest = req.body;
+
+    // Validate request
+    if (
+      !stylingRequest.pageSpecificFeedback &&
+      !stylingRequest.generalFeedback
+    ) {
+      const error: ErrorResponse = {
+        error: "Either pageSpecificFeedback or generalFeedback is required",
+      };
+      return res.status(400).json(error);
+    }
+
+    // Get the existing form
+    const existingForm = generatedForms.get(formId);
+    if (!existingForm) {
+      const error: ErrorResponse = { error: "Form not found" };
+      return res.status(404).json(error);
+    }
+
+    console.log(`Processing styling request for form ${formId}:`);
+    console.log(
+      `- Page-specific styling: ${
+        stylingRequest.pageSpecificFeedback?.length || 0
+      } pages`
+    );
+    console.log(
+      `- General styling: ${stylingRequest.generalFeedback ? "Yes" : "No"}`
+    );
+
+    // Track what pages are being styled
+    const stylingChanges = {
+      pagesStyled:
+        stylingRequest.pageSpecificFeedback?.map((f: any) => f.pageId) || [],
+      generalChanges: stylingRequest.generalFeedback
+        ? [stylingRequest.generalFeedback]
+        : [],
+    };
+
+    // Apply styling changes
+    const styledForm = await aiService.applyFormStyling(
+      existingForm,
+      stylingRequest
+    );
+
+    // Update the cached form
+    generatedForms.set(styledForm.id, styledForm);
+
+    const response: StylingResponse = {
+      success: true,
+      message: "Form styling applied successfully",
+      ...styledForm,
+      stylingChanges,
+    };
+
+    console.log(`✅ Styling applied: ${styledForm.id}`);
+    console.log(`   Styled pages: ${stylingChanges.pagesStyled.length}`);
+    console.log(`   General changes: ${stylingChanges.generalChanges.length}`);
+
+    res.json(response);
+  } catch (error) {
+    console.error("Styling application error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to apply styling",
       details: error instanceof Error ? error.message : "Unknown error",
     };
     res.status(500).json(errorResponse);
@@ -861,6 +937,7 @@ app.listen(PORT, () => {
   console.log(`  GET    /api/forms/:id             - Get specific form`);
   console.log(`  PUT    /api/forms/:id/edit        - Edit existing form`);
   console.log(`  PUT    /api/forms/:id/clone-edit  - Clone and edit form`);
+  console.log(`  PUT    /api/forms/:id/styling     - Apply styling changes`);
   console.log(`  DELETE /api/forms/:id             - Delete specific form`);
   console.log(`  DELETE /api/forms?confirm=true    - Delete all forms`);
   console.log(`  POST   /api/forms/delete-batch    - Batch delete forms`);

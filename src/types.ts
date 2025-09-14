@@ -178,6 +178,27 @@ export interface FeedbackEditResponse {
   };
 }
 
+export interface StylingRequest {
+  formId: string;
+  pageSpecificFeedback?: PageStylingFeedback[];
+  generalFeedback?: string;
+}
+
+export interface PageStylingFeedback {
+  pageId: string;
+  pageTitle: string;
+  feedbacks: string[];
+}
+
+export interface StylingResponse extends FormDefinition {
+  success: boolean;
+  message: string;
+  stylingChanges: {
+    pagesStyled: string[];
+    generalChanges: string[];
+  };
+}
+
 // ============== VALIDATION TYPES ==============
 
 export type InputType =
