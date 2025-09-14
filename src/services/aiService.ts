@@ -1354,16 +1354,16 @@ Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "me
         messages: [
           {
             role: "system",
-            content: `You are a Tailwind CSS expert. You MUST modify the form JSON to include a "styles" object with CSS classes AND add class names to elements so the frontend knows where to apply them.
+            content: `You are a Tailwind CSS expert. You MUST modify the form JSON to include a "styles" object with CSS classes AND add a "classNames" field to pages and options.
 
 MANDATORY REQUIREMENTS:
 1. ALWAYS include a "styles" object at the root level with CSS selectors and classes
-2. ADD class name fields to pages and options that reference the styles
+2. ADD "classNames" field to pages and options with comma-separated class names
 3. Use semantic class names like "page-header", "form-container", "input-field"
 
 APPROACH:
 A) "styles" object: Contains CSS selectors (.class, #id, tag) and their Tailwind classes
-B) Class name fields: Added to elements to reference which styles apply to them
+B) "classNames" field: Contains comma-separated class names that reference the styles
 
 EXAMPLE RESPONSE FORMAT:
 {
@@ -1373,15 +1373,12 @@ EXAMPLE RESPONSE FORMAT:
     {
       "id": "page-1",
       "label": "Contact Info",
-      "containerClass": "page-container",
-      "headerClass": "page-header", 
-      "formClass": "form-container",
+      "classNames": "page-container, page-header, form-container",
       "options": [
         {
           "id": "opt-1",
           "label": "Name",
-          "labelClass": "field-label",
-          "inputClass": "input-field"
+          "classNames": "field-label, input-field"
         }
       ]
     }
@@ -1400,10 +1397,10 @@ EXAMPLE RESPONSE FORMAT:
 
 CRITICAL RULES:
 - ALWAYS include the "styles" object with CSS selectors and Tailwind classes
-- ADD class name fields (containerClass, headerClass, formClass, labelClass, inputClass) to elements
+- ADD "classNames" field to pages and options with comma-separated class names
 - Use semantic class names that match the styles object
 - Apply styling changes based on user feedback
-- The frontend will use the class name fields to know which styles to apply`,
+- The frontend will parse the comma-separated classNames to apply styles`,
           },
           {
             role: "user",
@@ -1500,25 +1497,24 @@ STYLING CHANGES TO APPLY:
 
 CLASS NAME ASSIGNMENT APPROACH:
 
-ASSIGN CLASS NAMES TO ELEMENTS BASED ON STYLING FEEDBACK:
+ASSIGN COMMA-SEPARATED CLASS NAMES TO ELEMENTS:
 
-1. **Page-Specific Styling**: Add class name fields to the specific page mentioned in feedback
-   - If feedback mentions "page-1" or "Contact Information", add class names to that page
-   - Use: containerClass, headerClass, formClass
+1. **Page-Specific Styling**: Add "classNames" field to the specific page mentioned in feedback
+   - If feedback mentions "page-1" or "Contact Information", add classNames to that page
+   - Example: "classNames": "page-container, page-header, form-container"
 
-2. **General Styling**: Add class names to ALL pages and relevant options
-   - If feedback says "all inputs" or "center everything", apply class names to all applicable elements
-   - Use: labelClass, inputClass, className
+2. **General Styling**: Add "classNames" field to ALL pages and relevant options
+   - If feedback says "all inputs" or "center everything", apply classNames to all applicable elements
+   - Example: "classNames": "field-label, input-field, rounded-input"
 
 3. **Element Mapping**:
-   - Page background → page.containerClass = "page-container"
-   - Page title/header → page.headerClass = "page-header"  
-   - Form styling → page.formClass = "form-container"
-   - Input styling → option.inputClass = "input-field"
-   - Label styling → option.labelClass = "field-label"
+   - Page styling → page.classNames = "page-container, page-header, form-container"
+   - Input styling → option.classNames = "field-label, input-field"
+   - Button styling → option.classNames = "submit-button, primary-btn"
 
-4. **Semantic Class Names**:
-   - Use descriptive names: "page-header", "form-container", "input-field", "submit-button"
+4. **Format Rules**:
+   - Use comma-separated values: "class1, class2, class3"
+   - Use semantic class names: "page-header", "form-container", "input-field"
    - Match class names in the styles object: .page-header, .form-container, .input-field
 
 REQUIRED JSON STRUCTURE:

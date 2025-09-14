@@ -26,10 +26,7 @@ export interface FormPage {
     form?: string;
     [key: string]: string | undefined;
   };
-  className?: string; // CSS class name for this page
-  containerClass?: string; // CSS class for page container
-  headerClass?: string; // CSS class for page header
-  formClass?: string; // CSS class for form element
+  classNames?: string; // CSS class names for this page (comma-separated)
 }
 
 export interface PageOption {
@@ -43,9 +40,7 @@ export interface PageOption {
   // Validation configuration for this input
   inputType?: InputType; // The actual HTML input type for validation
   validation?: ValidationConfig; // Validation rules for this input
-  className?: string; // CSS class name for this option
-  labelClass?: string; // CSS class for the label
-  inputClass?: string; // CSS class for the input element
+  classNames?: string; // CSS class names for this option (comma-separated)
 }
 
 export interface SelectOption {
