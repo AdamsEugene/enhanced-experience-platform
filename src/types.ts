@@ -300,3 +300,27 @@ export interface ValidationResult {
   warnings?: string[];
   sanitizedValue?: any; // Cleaned/formatted value if applicable
 }
+
+// ============== WIDGET RECOMMENDATION TYPES ==============
+
+export interface WidgetRecommendationRequest {
+  userIntent: string;
+  context?: string;
+}
+
+export interface WidgetPage {
+  pageId: string;
+  pageTitle: string;
+  widgetType: string;
+  widgetConfig?: Record<string, any>; // Optional configuration for the widget
+  order: number;
+  manifest?: any; // For custom widgets, include the full manifest
+}
+
+export interface WidgetRecommendationResponse {
+  success: boolean;
+  message: string;
+  pages: WidgetPage[];
+  totalPages: number;
+  flowDescription: string;
+}

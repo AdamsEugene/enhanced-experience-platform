@@ -14,9 +14,12 @@ import {
   StylingResponse,
   ValidationRequest,
   ValidationResult,
+  WidgetRecommendationRequest,
+  WidgetRecommendationResponse,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { ValidationService } from "./services/validationService";
+import { WidgetService } from "./services/widgetService";
 
 // Load environment variables
 dotenv.config();
@@ -103,6 +106,7 @@ if (!openaiApiKey) {
 }
 
 const aiService = new OpenAIService(openaiApiKey);
+const widgetService = new WidgetService(aiService);
 
 // Middleware for logging
 app.use((req, res, next) => {
@@ -119,6 +123,43 @@ app.get("/health", (req, res) => {
     totalSubmissions: formSubmissions.size,
     aiProvider: "OpenAI GPT-4o",
   });
+});
+
+// Recommend widgets based on user intent
+app.post("/api/widgets/recommend", async (req, res) => {
+  try {
+    const { userIntent, context }: WidgetRecommendationRequest = req.body;
+
+    if (
+      !userIntent ||
+      typeof userIntent !== "string" ||
+      userIntent.trim().length === 0
+    ) {
+      const error: ErrorResponse = {
+        error: "userIntent is required and must be a non-empty string",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log("🔍 Generating widget recommendations for intent:", userIntent);
+
+    const recommendations = await widgetService.recommendWidgets({
+      userIntent: userIntent.trim(),
+      context: context?.trim(),
+    });
+
+    console.log(
+      `✅ Widget recommendations generated: ${recommendations.totalPages} pages`
+    );
+    res.json(recommendations);
+  } catch (error) {
+    console.error("Widget recommendation error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to generate widget recommendations",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
 });
 
 // Generate loading messages for user while form is being created
@@ -929,6 +970,9 @@ app.listen(PORT, () => {
     }`
   );
   console.log(`\n📝 Available endpoints:`);
+  console.log(
+    `  POST   /api/widgets/recommend     - Recommend widgets for user intent`
+  );
   console.log(
     `  POST   /api/forms/loading-messages - Generate loading messages`
   );
