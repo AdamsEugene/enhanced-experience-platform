@@ -296,18 +296,23 @@ export class WidgetService {
 
   private generateCustomManifestForStep(step: string, pageId: string): any {
     const stepLower = step.toLowerCase();
+    const isFirstPage = pageId === "page-1";
 
     // Generate appropriate manifest based on step type
     if (stepLower.includes("contact") || stepLower.includes("info")) {
-      return this.generateContactManifest(pageId, step);
+      return this.generateContactManifest(pageId, step, isFirstPage);
     } else if (stepLower.includes("survey") || stepLower.includes("feedback")) {
-      return this.generateSurveyManifest(pageId, step);
+      return this.generateSurveyManifest(pageId, step, isFirstPage);
     } else {
-      return this.generateGenericManifest(pageId, step);
+      return this.generateGenericManifest(pageId, step, isFirstPage);
     }
   }
 
-  private generateContactManifest(pageId: string, step: string): any {
+  private generateContactManifest(
+    pageId: string,
+    step: string,
+    isFirstPage: boolean = false
+  ): any {
     return {
       id: pageId,
       title: this.capitalizeStep(step),
@@ -364,11 +369,23 @@ export class WidgetService {
           successMessage: "Contact information saved!",
           errorMessage: "Please check your inputs and try again.",
         },
+        ...(isFirstPage
+          ? {}
+          : {
+              back: {
+                label: "← Back",
+                action: "back",
+              },
+            }),
       },
     };
   }
 
-  private generateSurveyManifest(pageId: string, step: string): any {
+  private generateSurveyManifest(
+    pageId: string,
+    step: string,
+    isFirstPage: boolean = false
+  ): any {
     return {
       id: pageId,
       title: this.capitalizeStep(step),
@@ -429,11 +446,23 @@ export class WidgetService {
           successMessage: "Thank you for your feedback!",
           errorMessage: "Please complete the required fields.",
         },
+        ...(isFirstPage
+          ? {}
+          : {
+              back: {
+                label: "← Back",
+                action: "back",
+              },
+            }),
       },
     };
   }
 
-  private generateGenericManifest(pageId: string, step: string): any {
+  private generateGenericManifest(
+    pageId: string,
+    step: string,
+    isFirstPage: boolean = false
+  ): any {
     return {
       id: pageId,
       title: this.capitalizeStep(step),
@@ -472,6 +501,14 @@ export class WidgetService {
           successMessage: "Information saved successfully!",
           errorMessage: "Please check your inputs and try again.",
         },
+        ...(isFirstPage
+          ? {}
+          : {
+              back: {
+                label: "← Back",
+                action: "back",
+              },
+            }),
       },
     };
   }
@@ -777,7 +814,7 @@ Respond with JSON containing pages array and flowDescription.
         widgetType: "custom",
         widgetConfig: {},
         order: 3,
-        manifest: this.generateFallbackManifest(userIntent, "page-3"),
+        manifest: this.generateFallbackManifest(userIntent, "page-3", false),
       },
       {
         pageId: "page-4",
@@ -785,7 +822,7 @@ Respond with JSON containing pages array and flowDescription.
         widgetType: "custom",
         widgetConfig: {},
         order: 4,
-        manifest: this.generateFallbackManifest(userIntent, "page-4", true),
+        manifest: this.generateFallbackManifest(userIntent, "page-4", false),
       },
     ];
 
@@ -801,12 +838,14 @@ Respond with JSON containing pages array and flowDescription.
   private generateFallbackManifest(
     userIntent: string,
     pageId: string,
-    isSecondary: boolean = false
+    isFirstPage: boolean = false
   ): any {
-    const baseTitle = isSecondary ? "Additional Information" : "Details";
-    const baseDescription = isSecondary
-      ? `Additional information needed for: ${userIntent}`
-      : `Please provide details for: ${userIntent}`;
+    const baseTitle =
+      pageId === "page-4" ? "Additional Information" : "Details";
+    const baseDescription =
+      pageId === "page-4"
+        ? `Additional information needed for: ${userIntent}`
+        : `Please provide details for: ${userIntent}`;
 
     return {
       id: pageId,
@@ -840,7 +879,7 @@ Respond with JSON containing pages array and flowDescription.
             { label: "Urgent - Immediate attention", value: "urgent" },
           ],
         },
-        ...(isSecondary
+        ...(pageId === "page-4"
           ? [
               {
                 id: "contactPreference",
@@ -884,7 +923,10 @@ Respond with JSON containing pages array and flowDescription.
             rows: [
               { fields: ["description"] },
               { fields: ["priority"] },
-              { fields: isSecondary ? ["contactPreference"] : ["category"] },
+              {
+                fields:
+                  pageId === "page-4" ? ["contactPreference"] : ["category"],
+              },
             ],
           },
         ],
@@ -895,10 +937,14 @@ Respond with JSON containing pages array and flowDescription.
           successMessage: "Information saved successfully!",
           errorMessage: "Please check your inputs and try again.",
         },
-        cancel: {
-          label: "← Back",
-          action: "back",
-        },
+        ...(isFirstPage
+          ? {}
+          : {
+              back: {
+                label: "← Back",
+                action: "back",
+              },
+            }),
       },
       styling: {
         theme: "light",
