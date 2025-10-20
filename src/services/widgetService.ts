@@ -169,10 +169,17 @@ export class WidgetService {
       ) {
         const step = this.extractStepFromSentence(sentence);
         if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      } else if (sentence.includes("fourth") || sentence.includes("step 4")) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      } else if (sentence.includes("fifth") || sentence.includes("step 5")) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
       } else if (
+        sentence.includes("sixth") ||
         sentence.includes("last") ||
         sentence.includes("final") ||
-        sentence.includes("step 4")
+        sentence.includes("step 6")
       ) {
         const step = this.extractStepFromSentence(sentence);
         if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
@@ -187,7 +194,8 @@ export class WidgetService {
     const patterns = [
       /will be (.*)/,
       /is (.*)/,
-      /step.*?(authentication|survey|plans?|contact|profile|address)/,
+      /step.*?:\s*([^-]+)/,
+      /step.*?(authentication|survey|plans?|contact|profile|address|coverage|family|dependents|confirmation|summary)/,
     ];
 
     for (const pattern of patterns) {
@@ -212,31 +220,36 @@ export class WidgetService {
       return "AuthenticationWidget";
     }
     if (
-      stepLower.includes("survey") ||
-      stepLower.includes("question") ||
-      stepLower.includes("feedback")
-    ) {
-      return null; // Will create custom survey widget
-    }
-    if (
-      stepLower.includes("plan") ||
-      stepLower.includes("pricing") ||
-      stepLower.includes("option")
-    ) {
-      return "PlanSelectionWidget";
-    }
-    if (
-      stepLower.includes("contact") ||
       stepLower.includes("profile") ||
-      stepLower.includes("personal")
+      stepLower.includes("personal") ||
+      stepLower.includes("verification")
     ) {
       return "ManagedProfileWidget";
     }
     if (stepLower.includes("address") || stepLower.includes("location")) {
       return "AddressWidget";
     }
-    if (stepLower.includes("dependent") || stepLower.includes("family")) {
+    if (
+      stepLower.includes("coverage") ||
+      stepLower.includes("dependent") ||
+      stepLower.includes("family") ||
+      stepLower.includes("tier")
+    ) {
       return "ManagedDependentsWidget";
+    }
+    if (
+      stepLower.includes("plan") ||
+      stepLower.includes("pricing") ||
+      stepLower.includes("selection")
+    ) {
+      return "PlanSelectionWidget";
+    }
+    if (
+      stepLower.includes("survey") ||
+      stepLower.includes("question") ||
+      stepLower.includes("feedback")
+    ) {
+      return null; // Will create custom survey widget
     }
 
     return null; // Will create custom widget
