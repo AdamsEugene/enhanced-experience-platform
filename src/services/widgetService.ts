@@ -83,20 +83,6 @@ export class WidgetService {
         "beneficiaries",
       ],
     },
-    SurveyWidget: {
-      description:
-        "Dynamic survey form with various question types including multiple choice, rating scales, text inputs, and conditional logic.",
-      useCases: [
-        "survey",
-        "questionnaire",
-        "feedback",
-        "poll",
-        "questions",
-        "assessment",
-        "evaluation",
-        "rating",
-      ],
-    },
   };
 
   constructor(openaiService: OpenAIService) {
@@ -230,7 +216,7 @@ export class WidgetService {
       stepLower.includes("question") ||
       stepLower.includes("feedback")
     ) {
-      return "SurveyWidget";
+      return null; // Will create custom survey widget
     }
     if (
       stepLower.includes("plan") ||
@@ -761,7 +747,6 @@ Respond with JSON containing pages array and flowDescription.
       AddressWidget: "Address Information",
       PlanSelectionWidget: "Plan Selection",
       ManagedDependentsWidget: "Dependents & Coverage",
-      SurveyWidget: "Survey",
     };
 
     return titles[widgetName] || widgetName.replace("Widget", "");
