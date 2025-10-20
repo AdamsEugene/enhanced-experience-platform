@@ -20,6 +20,8 @@ export class WidgetService {
         "verify identity",
         "email verification",
         "phone verification",
+        "auth",
+        "authenticate",
       ],
     },
     ManagedProfileWidget: {
@@ -33,6 +35,9 @@ export class WidgetService {
         "employer selection",
         "personal details",
         "name and contact",
+        "contact us",
+        "contact form",
+        "get in touch",
       ],
     },
     AddressWidget: {
@@ -59,6 +64,10 @@ export class WidgetService {
         "subscription plans",
         "pricing plans",
         "select coverage",
+        "plans",
+        "plan",
+        "pricing",
+        "options",
       ],
     },
     ManagedDependentsWidget: {
@@ -74,6 +83,20 @@ export class WidgetService {
         "beneficiaries",
       ],
     },
+    SurveyWidget: {
+      description:
+        "Dynamic survey form with various question types including multiple choice, rating scales, text inputs, and conditional logic.",
+      useCases: [
+        "survey",
+        "questionnaire",
+        "feedback",
+        "poll",
+        "questions",
+        "assessment",
+        "evaluation",
+        "rating",
+      ],
+    },
   };
 
   constructor(openaiService: OpenAIService) {
@@ -87,6 +110,15 @@ export class WidgetService {
       console.log(
         `🔍 Analyzing user intent for widget recommendations: "${request.userIntent}"`
       );
+
+      // Check if user specified a sequence
+      const sequenceMatch = this.parseUserSequence(request.userIntent);
+      if (sequenceMatch.length > 0) {
+        console.log(
+          `✅ Found user-specified sequence with ${sequenceMatch.length} steps`
+        );
+        return this.buildSequenceResponse(sequenceMatch, request.userIntent);
+      }
 
       // First, try to match with available widgets using keyword matching
       const directMatches = this.findDirectWidgetMatches(
@@ -112,6 +144,350 @@ export class WidgetService {
         }`
       );
     }
+  }
+
+  private parseUserSequence(
+    userIntent: string
+  ): Array<{ step: string; widget: string | null }> {
+    const text = userIntent.toLowerCase();
+
+    // Look for sequence indicators
+    const sequencePatterns = [
+      /first.*?will be (.*?)[\.,]/,
+      /next.*?will be (.*?)[\.,]/,
+      /then.*?will be (.*?)[\.,]/,
+      /last.*?will be (.*?)[\.,]/,
+      /finally.*?will be (.*?)[\.,]/,
+    ];
+
+    const steps: Array<{ step: string; widget: string | null }> = [];
+
+    // Extract steps from the text
+    const sentences = text.split(/[,\.]/);
+
+    for (const sentence of sentences) {
+      if (sentence.includes("first") || sentence.includes("step 1")) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      } else if (
+        sentence.includes("next") ||
+        sentence.includes("second") ||
+        sentence.includes("step 2")
+      ) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      } else if (
+        sentence.includes("then") ||
+        sentence.includes("third") ||
+        sentence.includes("step 3")
+      ) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      } else if (
+        sentence.includes("last") ||
+        sentence.includes("final") ||
+        sentence.includes("step 4")
+      ) {
+        const step = this.extractStepFromSentence(sentence);
+        if (step) steps.push({ step, widget: this.matchStepToWidget(step) });
+      }
+    }
+
+    return steps;
+  }
+
+  private extractStepFromSentence(sentence: string): string | null {
+    // Extract the step name from various patterns
+    const patterns = [
+      /will be (.*)/,
+      /is (.*)/,
+      /step.*?(authentication|survey|plans?|contact|profile|address)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = sentence.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+
+    return null;
+  }
+
+  private matchStepToWidget(step: string): string | null {
+    const stepLower = step.toLowerCase();
+
+    // Direct widget matching
+    if (
+      stepLower.includes("auth") ||
+      stepLower.includes("login") ||
+      stepLower.includes("sign")
+    ) {
+      return "AuthenticationWidget";
+    }
+    if (
+      stepLower.includes("survey") ||
+      stepLower.includes("question") ||
+      stepLower.includes("feedback")
+    ) {
+      return "SurveyWidget";
+    }
+    if (
+      stepLower.includes("plan") ||
+      stepLower.includes("pricing") ||
+      stepLower.includes("option")
+    ) {
+      return "PlanSelectionWidget";
+    }
+    if (
+      stepLower.includes("contact") ||
+      stepLower.includes("profile") ||
+      stepLower.includes("personal")
+    ) {
+      return "ManagedProfileWidget";
+    }
+    if (stepLower.includes("address") || stepLower.includes("location")) {
+      return "AddressWidget";
+    }
+    if (stepLower.includes("dependent") || stepLower.includes("family")) {
+      return "ManagedDependentsWidget";
+    }
+
+    return null; // Will create custom widget
+  }
+
+  private buildSequenceResponse(
+    sequence: Array<{ step: string; widget: string | null }>,
+    userIntent: string
+  ): WidgetRecommendationResponse {
+    const pages: WidgetPage[] = [];
+
+    sequence.forEach((item, index) => {
+      const order = index + 1;
+
+      if (item.widget) {
+        // Use existing widget
+        pages.push({
+          pageId: `page-${order}`,
+          pageTitle: this.getWidgetTitle(item.widget),
+          widgetType: item.widget,
+          widgetConfig: {},
+          order,
+        });
+      } else {
+        // Create custom widget
+        pages.push({
+          pageId: `page-${order}`,
+          pageTitle: this.capitalizeStep(item.step),
+          widgetType: "custom",
+          widgetConfig: {},
+          order,
+          manifest: this.generateCustomManifestForStep(
+            item.step,
+            `page-${order}`
+          ),
+        });
+      }
+    });
+
+    return {
+      success: true,
+      message: "Widget sequence generated based on user specification",
+      pages,
+      totalPages: pages.length,
+      flowDescription: `User-specified sequence: ${sequence
+        .map((s) => s.step)
+        .join(" → ")}`,
+    };
+  }
+
+  private capitalizeStep(step: string): string {
+    return step
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  private generateCustomManifestForStep(step: string, pageId: string): any {
+    const stepLower = step.toLowerCase();
+
+    // Generate appropriate manifest based on step type
+    if (stepLower.includes("contact") || stepLower.includes("info")) {
+      return this.generateContactManifest(pageId, step);
+    } else if (stepLower.includes("survey") || stepLower.includes("feedback")) {
+      return this.generateSurveyManifest(pageId, step);
+    } else {
+      return this.generateGenericManifest(pageId, step);
+    }
+  }
+
+  private generateContactManifest(pageId: string, step: string): any {
+    return {
+      id: pageId,
+      title: this.capitalizeStep(step),
+      description: `Please provide your contact information`,
+      fields: [
+        {
+          id: "fullName",
+          type: "text",
+          label: "Full Name",
+          placeholder: "Enter your full name",
+          required: true,
+          validation: { minLength: 2, maxLength: 50 },
+        },
+        {
+          id: "email",
+          type: "email",
+          label: "Email Address",
+          placeholder: "your@email.com",
+          required: true,
+        },
+        {
+          id: "phone",
+          type: "phone",
+          label: "Phone Number",
+          placeholder: "(555) 123-4567",
+          required: true,
+        },
+        {
+          id: "message",
+          type: "textarea",
+          label: "Message",
+          placeholder: "How can we help you?",
+          required: false,
+          rows: 4,
+        },
+      ],
+      layout: {
+        type: "form",
+        sections: [
+          {
+            id: "contact-section",
+            title: "Contact Information",
+            rows: [
+              { fields: ["fullName"] },
+              { fields: ["email", "phone"] },
+              { fields: ["message"] },
+            ],
+          },
+        ],
+      },
+      actions: {
+        submit: {
+          label: "Continue",
+          successMessage: "Contact information saved!",
+          errorMessage: "Please check your inputs and try again.",
+        },
+      },
+    };
+  }
+
+  private generateSurveyManifest(pageId: string, step: string): any {
+    return {
+      id: pageId,
+      title: this.capitalizeStep(step),
+      description: `Please answer a few questions`,
+      fields: [
+        {
+          id: "satisfaction",
+          type: "radio",
+          label: "How satisfied are you with our service?",
+          required: true,
+          options: [
+            { label: "Very Satisfied", value: "very-satisfied" },
+            { label: "Satisfied", value: "satisfied" },
+            { label: "Neutral", value: "neutral" },
+            { label: "Dissatisfied", value: "dissatisfied" },
+            { label: "Very Dissatisfied", value: "very-dissatisfied" },
+          ],
+        },
+        {
+          id: "improvements",
+          type: "checkbox",
+          label: "What areas could we improve?",
+          required: false,
+          options: [
+            { label: "Customer Service", value: "customer-service" },
+            { label: "Product Quality", value: "product-quality" },
+            { label: "Pricing", value: "pricing" },
+            { label: "Website Experience", value: "website" },
+            { label: "Delivery Speed", value: "delivery" },
+          ],
+        },
+        {
+          id: "comments",
+          type: "textarea",
+          label: "Additional Comments",
+          placeholder: "Tell us more about your experience...",
+          required: false,
+          rows: 3,
+        },
+      ],
+      layout: {
+        type: "form",
+        sections: [
+          {
+            id: "survey-section",
+            title: "Your Feedback",
+            rows: [
+              { fields: ["satisfaction"] },
+              { fields: ["improvements"] },
+              { fields: ["comments"] },
+            ],
+          },
+        ],
+      },
+      actions: {
+        submit: {
+          label: "Continue",
+          successMessage: "Thank you for your feedback!",
+          errorMessage: "Please complete the required fields.",
+        },
+      },
+    };
+  }
+
+  private generateGenericManifest(pageId: string, step: string): any {
+    return {
+      id: pageId,
+      title: this.capitalizeStep(step),
+      description: `Please provide information for: ${step}`,
+      fields: [
+        {
+          id: "input1",
+          type: "text",
+          label: "Primary Input",
+          placeholder: `Enter ${step} information`,
+          required: true,
+          validation: { minLength: 2, maxLength: 100 },
+        },
+        {
+          id: "notes",
+          type: "textarea",
+          label: "Additional Notes",
+          placeholder: "Any additional information...",
+          required: false,
+          rows: 3,
+        },
+      ],
+      layout: {
+        type: "form",
+        sections: [
+          {
+            id: "main-section",
+            title: step,
+            rows: [{ fields: ["input1"] }, { fields: ["notes"] }],
+          },
+        ],
+      },
+      actions: {
+        submit: {
+          label: "Continue",
+          successMessage: "Information saved successfully!",
+          errorMessage: "Please check your inputs and try again.",
+        },
+      },
+    };
   }
 
   private findDirectWidgetMatches(
@@ -385,6 +761,7 @@ Respond with JSON containing pages array and flowDescription.
       AddressWidget: "Address Information",
       PlanSelectionWidget: "Plan Selection",
       ManagedDependentsWidget: "Dependents & Coverage",
+      SurveyWidget: "Survey",
     };
 
     return titles[widgetName] || widgetName.replace("Widget", "");

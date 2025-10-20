@@ -1354,53 +1354,28 @@ Respond with ONLY a JSON array like: ["message 1", "message 2", "message 3", "me
         messages: [
           {
             role: "system",
-            content: `You are a Tailwind CSS expert. You MUST modify the form JSON to include a "styles" object with CSS classes AND add a "classNames" field to pages and options.
+            content: `You are a form styling assistant. Your ONLY job is to modify existing form JSON by adding CSS styling.
 
-MANDATORY REQUIREMENTS:
-1. ALWAYS include a "styles" object at the root level with CSS selectors and classes
-2. ADD "classNames" field to pages and options with comma-separated class names
-3. Use semantic class names like "page-header", "form-container", "input-field"
+CRITICAL: You MUST return a FORM JSON, not product data or anything else.
 
-APPROACH:
-A) "styles" object: Contains CSS selectors (.class, #id, tag) and their Tailwind classes
-B) "classNames" field: Contains comma-separated class names that reference the styles
+TASK: Take the existing form and add styling based on user feedback.
 
-EXAMPLE RESPONSE FORMAT:
-{
-  "id": "form-123",
-  "name": "Form Name",
-  "pages": [
-    {
-      "id": "page-1",
-      "label": "Contact Info",
-      "classNames": "page-container, page-header, form-container",
-      "options": [
-        {
-          "id": "opt-1",
-          "label": "Name",
-          "classNames": "field-label, input-field"
-        }
-      ]
-    }
-  ],
-  "styles": {
-    "container": "bg-gray-100 p-8",
-    ".page-header": "text-2xl font-bold mb-4",
-    ".page-container": "bg-white p-6 rounded-lg shadow-md",
-    ".form-container": "space-y-4",
-    ".field-label": "block text-sm font-medium text-gray-700",
-    ".input-field": "w-full p-3 border border-gray-300 rounded-md",
-    "#page-1": "bg-blue-50",
-    "h1": "text-3xl font-serif"
-  }
-}
+REQUIREMENTS:
+1. Return the COMPLETE existing form with styling added
+2. Add "styles" object at root level with Tailwind CSS classes
+3. Add "classNames" field to pages/options that need styling
+4. Apply ONLY the styling changes requested by the user
 
-CRITICAL RULES:
-- ALWAYS include the "styles" object with CSS selectors and Tailwind classes
-- ADD "classNames" field to pages and options with comma-separated class names
-- Use semantic class names that match the styles object
-- Apply styling changes based on user feedback
-- The frontend will parse the comma-separated classNames to apply styles`,
+FORBIDDEN:
+- Do NOT return product data, API responses, or unrelated JSON
+- Do NOT change form structure, IDs, or functionality
+- Do NOT add styling that wasn't requested
+
+EXAMPLE INPUT/OUTPUT:
+Input: Form with pages, user wants "red background"
+Output: Same form + "styles": {"container": "bg-red-500"} + classNames added
+
+You MUST respond with a valid form JSON that includes the original form data plus styling.`,
           },
           {
             role: "user",
