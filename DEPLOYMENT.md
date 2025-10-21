@@ -27,9 +27,9 @@ This project is configured to deploy automatically to Render.
 3. **Deploy Settings**
    - **Build Command**: `pnpm install --frozen-lockfile`
    - **Start Command**: `node dist/server.js`
-   - **Node Version**: 22.16.0 (or latest LTS)
+   - **Node Version**: Set via `.node-version` file (22.16.0)
 
-The `render.yaml` file in the root directory contains these settings.
+The `render.yaml` file in the root directory contains these settings. The `.node-version` file specifies the Node.js version.
 
 ### How It Works
 
