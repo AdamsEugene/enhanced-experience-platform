@@ -325,9 +325,11 @@ CRITICAL RULES:
 - Create custom manifests when you need specific fields or functionality
 - Custom manifests must be complete with all required fields
 - Each page must have a clear purpose
-- Maintain logical progression (e.g., auth → personal info → specific details → confirmation)
+- Maintain logical progression (e.g., auth → personal info → specific details)
 - Always include proper validation, helper text, and user guidance
 - For custom pages, use appropriate field types and validation rules
+- DO NOT create summary, confirmation, or review pages - end the flow with the last data collection page
+- NO final summary pages, NO confirmation pages, NO review pages at the end
 
 RESPONSE FORMAT:
 Respond with ONLY valid JSON (no markdown, no explanations):
@@ -365,6 +367,7 @@ REQUIREMENTS:
 3. Generate custom manifests for specialized pages
 4. Ensure proper sequencing and logical flow
 5. Include appropriate validation and user guidance
+6. DO NOT create summary, confirmation, or review pages - end with the last data collection page
 
 DECISION CRITERIA:
 - Use AuthenticationWidget for: login, sign-in, authentication, identity verification
@@ -381,7 +384,10 @@ For custom pages, create detailed manifests with:
 - Logical layout (sections and rows)
 - Submit/cancel actions
 
-CRITICAL: In widgetConfig, ONLY include "title" and "subtitle" properties. Do not add any other properties.
+CRITICAL INSTRUCTIONS:
+1. In widgetConfig, ONLY include "title" and "subtitle" properties. Do not add any other properties.
+2. DO NOT create summary, confirmation, or review pages at the end of the workflow.
+3. End the workflow with the last data collection page.
 
 Example widgetConfig:
 {
@@ -389,6 +395,6 @@ Example widgetConfig:
   "subtitle": "Enter your credentials to continue"
 }
 
-Respond with the complete workflow in JSON format.`;
+Respond with the complete workflow in JSON format. Remember: NO summary or confirmation pages!`;
   }
 }
