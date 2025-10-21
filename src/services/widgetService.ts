@@ -337,13 +337,18 @@ Respond with ONLY valid JSON (no markdown, no explanations):
       "pageId": "page-1",
       "pageTitle": "Page Title",
       "widgetType": "AuthenticationWidget|ManagedProfileWidget|AddressWidget|PlanSelectionWidget|ManagedDependentsWidget|custom",
-      "widgetConfig": {},
+      "widgetConfig": {
+        "title": "Optional custom title for this widget",
+        "subtitle": "Optional custom subtitle/description for this widget"
+      },
       "order": 1,
       "manifest": {...} // ONLY if widgetType is "custom"
     }
   ],
   "flowDescription": "Brief description of the overall flow and reasoning"
-}`;
+}
+
+IMPORTANT: For widgetConfig, ONLY include "title" and "subtitle" properties. Nothing else.`;
   }
 
   private buildWidgetAnalysisPrompt(
@@ -375,6 +380,14 @@ For custom pages, create detailed manifests with:
 - Clear labels and helper text
 - Logical layout (sections and rows)
 - Submit/cancel actions
+
+CRITICAL: In widgetConfig, ONLY include "title" and "subtitle" properties. Do not add any other properties.
+
+Example widgetConfig:
+{
+  "title": "Sign In to Your Account",
+  "subtitle": "Enter your credentials to continue"
+}
 
 Respond with the complete workflow in JSON format.`;
   }
