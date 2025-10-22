@@ -49,6 +49,8 @@ app.use(
         "http://127.0.0.1:4201", // Angular alternative
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8081",
+        "https://wizardbuilder.netlify.app",
+        "http://localhost:5173", // for local development
       ];
 
       // Add custom origin from environment variable if specified
