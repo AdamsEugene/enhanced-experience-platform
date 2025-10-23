@@ -16,6 +16,11 @@ import {
   ValidationResult,
   WidgetRecommendationRequest,
   WidgetRecommendationResponse,
+  ChatbotWizardStep1Request,
+  ChatbotWizardStep1Response,
+  ChatbotWizardStep2Request,
+  ChatbotWizardStep2Response,
+  ChatbotConfig,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { ValidationService } from "./services/validationService";
@@ -100,6 +105,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 const generatedForms = new Map<string, FormDefinition>();
 const formSubmissions = new Map<string, any>();
 
+// In-memory storage for chatbot wizard sessions
+interface ChatbotWizardSession {
+  id: string;
+  userDescription: string;
+  questions?: string[];
+  createdAt: string;
+}
+const chatbotSessions = new Map<string, ChatbotWizardSession>();
+const generatedChatbots = new Map<string, ChatbotConfig>();
+
 // Initialize AI service
 const openaiApiKey = process.env.OPENAI_API_KEY;
 if (!openaiApiKey) {
@@ -163,6 +178,185 @@ app.post("/api/widgets/recommend", async (req, res) => {
     res.status(500).json(errorResponse);
   }
 });
+
+// ============== CHATBOT WIZARD ENDPOINTS ==============
+
+// Step 1: Analyze user's chatbot description
+app.post("/api/chatbot-wizard/step1", async (req, res) => {
+  try {
+    const { userDescription }: ChatbotWizardStep1Request = req.body;
+
+    if (
+      !userDescription ||
+      typeof userDescription !== "string" ||
+      userDescription.trim().length === 0
+    ) {
+      const error: ErrorResponse = {
+        error: "userDescription is required and must be a non-empty string",
+      };
+      return res.status(400).json(error);
+    }
+
+    console.log(
+      "🤖 Step 1: Analyzing chatbot description:",
+      userDescription.substring(0, 100)
+    );
+
+    // Ask Claude if we have enough information
+    const analysisResult = await aiService.analyzeChatbotDescription(
+      userDescription.trim()
+    );
+
+    // Create a session
+    const sessionId = `chatbot-session-${Date.now()}-${uuidv4().split("-")[0]}`;
+    const session: ChatbotWizardSession = {
+      id: sessionId,
+      userDescription: userDescription.trim(),
+      questions: analysisResult.questions,
+      createdAt: new Date().toISOString(),
+    };
+
+    chatbotSessions.set(sessionId, session);
+
+    const response: ChatbotWizardStep1Response = {
+      success: true,
+      sessionId,
+      needsMoreInfo: !analysisResult.hasEnoughInfo,
+      questions: analysisResult.questions,
+      questionsText: analysisResult.questionsText,
+      message: analysisResult.hasEnoughInfo
+        ? "Great! We have enough information to generate your chatbot."
+        : "I have a few questions to better understand your chatbot needs.",
+    };
+
+    console.log(
+      `✅ Step 1 complete: needsMoreInfo=${response.needsMoreInfo}, questions=${
+        response.questions?.length || 0
+      }`
+    );
+    res.json(response);
+  } catch (error) {
+    console.error("Chatbot wizard step 1 error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to analyze chatbot description",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Step 2: Process answers and generate chatbot
+app.post("/api/chatbot-wizard/step2", async (req, res) => {
+  try {
+    const { sessionId, answers }: ChatbotWizardStep2Request = req.body;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      const error: ErrorResponse = {
+        error: "sessionId is required and must be a string",
+      };
+      return res.status(400).json(error);
+    }
+
+    if (
+      !answers ||
+      typeof answers !== "string" ||
+      answers.trim().length === 0
+    ) {
+      const error: ErrorResponse = {
+        error: "answers is required and must be a non-empty string",
+      };
+      return res.status(400).json(error);
+    }
+
+    // Retrieve session
+    const session = chatbotSessions.get(sessionId);
+    if (!session) {
+      const error: ErrorResponse = {
+        error: "Session not found or expired",
+        details: "Please start over from step 1",
+      };
+      return res.status(404).json(error);
+    }
+
+    console.log(`🤖 Step 2: Generating chatbot for session ${sessionId}`);
+
+    // Generate the chatbot configuration
+    const chatbotConfig = await aiService.generateChatbotConfig(
+      session.userDescription,
+      session.questions || [],
+      answers.trim()
+    );
+
+    // Store the generated chatbot
+    generatedChatbots.set(chatbotConfig.id, chatbotConfig);
+
+    // Generate chat link and phone number
+    const chatLink = `https://chat.example.com/${chatbotConfig.id}`;
+    const phoneNumber = generatePhoneNumber();
+
+    const response: ChatbotWizardStep2Response = {
+      success: true,
+      chatbotId: chatbotConfig.id,
+      message: "Your chatbot has been successfully created!",
+      chatLink,
+      phoneNumber,
+      chatbotConfig,
+    };
+
+    console.log(`✅ Chatbot generated: ${chatbotConfig.id}`);
+    console.log(`   Name: ${chatbotConfig.name}`);
+    console.log(`   Link: ${chatLink}`);
+    console.log(`   Phone: ${phoneNumber}`);
+
+    // Clean up session
+    chatbotSessions.delete(sessionId);
+
+    res.json(response);
+  } catch (error) {
+    console.error("Chatbot wizard step 2 error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to generate chatbot",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Get a specific chatbot by ID
+app.get("/api/chatbots/:id", (req, res) => {
+  const chatbotId = req.params.id;
+  const chatbot = generatedChatbots.get(chatbotId);
+
+  if (!chatbot) {
+    const error: ErrorResponse = { error: "Chatbot not found" };
+    return res.status(404).json(error);
+  }
+
+  res.json(chatbot);
+});
+
+// List all generated chatbots
+app.get("/api/chatbots", (req, res) => {
+  const chatbots = Array.from(generatedChatbots.values()).map((chatbot) => ({
+    id: chatbot.id,
+    name: chatbot.name,
+    description: chatbot.description,
+    createdAt: chatbot.createdAt,
+    capabilities: chatbot.capabilities,
+  }));
+
+  res.json({ chatbots, total: chatbots.length });
+});
+
+// Helper function to generate a phone number
+function generatePhoneNumber(): string {
+  // Generate a fake phone number for demo purposes
+  // Format: +1 (XXX) XXX-XXXX
+  const areaCode = Math.floor(Math.random() * 900) + 100;
+  const prefix = Math.floor(Math.random() * 900) + 100;
+  const lineNumber = Math.floor(Math.random() * 9000) + 1000;
+  return `+1 (${areaCode}) ${prefix}-${lineNumber}`;
+}
 
 // Generate loading messages for user while form is being created
 app.post("/api/forms/loading-messages", async (req, res) => {
@@ -975,6 +1169,14 @@ app.listen(PORT, () => {
   console.log(
     `  POST   /api/widgets/recommend     - Recommend widgets for user intent`
   );
+  console.log(
+    `  POST   /api/chatbot-wizard/step1  - Analyze chatbot description (Step 1)`
+  );
+  console.log(
+    `  POST   /api/chatbot-wizard/step2  - Generate chatbot config (Step 2)`
+  );
+  console.log(`  GET    /api/chatbots              - List all chatbots`);
+  console.log(`  GET    /api/chatbots/:id          - Get specific chatbot`);
   console.log(
     `  POST   /api/forms/loading-messages - Generate loading messages`
   );

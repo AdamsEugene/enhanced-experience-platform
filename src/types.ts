@@ -324,3 +324,42 @@ export interface WidgetRecommendationResponse {
   totalPages: number;
   flowDescription: string;
 }
+
+// ============== CHATBOT WIZARD TYPES ==============
+
+export interface ChatbotWizardStep1Request {
+  userDescription: string;
+}
+
+export interface ChatbotWizardStep1Response {
+  success: boolean;
+  sessionId: string;
+  needsMoreInfo: boolean;
+  questions?: string[]; // If needsMoreInfo is true
+  questionsText?: string; // Plain text version of questions
+  message: string;
+}
+
+export interface ChatbotWizardStep2Request {
+  sessionId: string;
+  answers: string; // Single textarea with all answers
+}
+
+export interface ChatbotWizardStep2Response {
+  success: boolean;
+  chatbotId: string;
+  message: string;
+  chatLink: string;
+  phoneNumber: string;
+  chatbotConfig: ChatbotConfig;
+}
+
+export interface ChatbotConfig {
+  id: string;
+  name: string;
+  description: string;
+  personality?: string;
+  capabilities?: string[];
+  conversationFlow?: any;
+  createdAt: string;
+}

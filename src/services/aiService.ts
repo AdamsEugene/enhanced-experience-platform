@@ -5,6 +5,7 @@ import {
   FeedbackEditRequest,
   StylingRequest,
   StylingResponse,
+  ChatbotConfig,
 } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import OpenAI from "openai";
@@ -1670,5 +1671,247 @@ CRITICAL STRUCTURE REQUIREMENTS:
 RESPOND WITH THE COMPLETE MODIFIED FORM AS VALID JSON ONLY.`;
 
     return prompt;
+  }
+
+  // ============== CHATBOT WIZARD METHODS ==============
+
+  async analyzeChatbotDescription(userDescription: string): Promise<{
+    hasEnoughInfo: boolean;
+    questions?: string[];
+    questionsText?: string;
+  }> {
+    try {
+      console.log("🔍 Analyzing chatbot description with AI...");
+
+      const prompt = this.buildChatbotAnalysisPrompt(userDescription);
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert AI assistant that helps design chatbots. Your job is to analyze a user's chatbot description and determine if you have enough information to create it, or if you need to ask clarifying questions.
+
+CRITICAL RULES:
+1. Be realistic - you will ALMOST ALWAYS need more information
+2. Ask NO MORE THAN 3 questions
+3. Questions should be specific and actionable
+4. Focus on: target audience, tone/personality, key capabilities, conversation flow
+5. Respond ONLY with valid JSON
+
+RESPONSE FORMAT:
+{
+  "hasEnoughInfo": false,
+  "questions": [
+    "Question 1?",
+    "Question 2?",
+    "Question 3?"
+  ],
+  "questionsText": "1. Question 1?\n2. Question 2?\n3. Question 3?"
+}
+
+If description is exceptionally detailed (rare), you may set hasEnoughInfo to true and omit questions.`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.2,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
+      }
+
+      console.log("📄 AI analysis response received");
+
+      // Parse the JSON response
+      const result = this.extractJSONFromResponse(content, "chatbot analysis");
+
+      // Validate response structure
+      if (typeof result.hasEnoughInfo !== "boolean") {
+        throw new Error("Invalid response: missing hasEnoughInfo boolean");
+      }
+
+      if (!result.hasEnoughInfo) {
+        if (!result.questions || !Array.isArray(result.questions)) {
+          throw new Error("Invalid response: missing questions array");
+        }
+
+        // Ensure we have no more than 3 questions
+        result.questions = result.questions.slice(0, 3);
+
+        // Generate questionsText if not provided
+        if (!result.questionsText) {
+          result.questionsText = result.questions
+            .map((q: string, i: number) => `${i + 1}. ${q}`)
+            .join("\n");
+        }
+      }
+
+      console.log(
+        `✅ Analysis complete: hasEnoughInfo=${
+          result.hasEnoughInfo
+        }, questions=${result.questions?.length || 0}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error("❌ Error analyzing chatbot description:", error);
+      throw new Error(
+        `Failed to analyze chatbot description: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  private buildChatbotAnalysisPrompt(userDescription: string): string {
+    return `Analyze this chatbot description and determine if we have enough information to build it:
+
+USER DESCRIPTION:
+"${userDescription}"
+
+EVALUATION CRITERIA:
+- Do we know the chatbot's primary purpose?
+- Do we know the target audience?
+- Do we know the desired tone/personality?
+- Do we know the key capabilities/features needed?
+- Do we have enough detail about the conversation flow?
+
+IF MISSING INFORMATION:
+- Ask NO MORE THAN 3 specific, actionable questions
+- Focus on the most critical gaps
+- Make questions clear and easy to answer
+
+RESPOND WITH JSON ONLY.`;
+  }
+
+  async generateChatbotConfig(
+    userDescription: string,
+    questions: string[],
+    answers: string
+  ): Promise<ChatbotConfig> {
+    try {
+      console.log("🤖 Generating chatbot configuration...");
+
+      const prompt = this.buildChatbotGenerationPrompt(
+        userDescription,
+        questions,
+        answers
+      );
+
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at designing chatbot configurations. Given a user's description and their answers to follow-up questions, you create a complete chatbot configuration.
+
+RESPONSE FORMAT (JSON ONLY):
+{
+  "name": "Chatbot Name",
+  "description": "Clear description of what the chatbot does",
+  "personality": "Description of the chatbot's tone and personality",
+  "capabilities": [
+    "Capability 1",
+    "Capability 2",
+    "Capability 3"
+  ],
+  "conversationFlow": {
+    "greeting": "Opening message",
+    "commonQuestions": [
+      {"question": "Question 1", "answer": "Answer 1"},
+      {"question": "Question 2", "answer": "Answer 2"}
+    ],
+    "fallbackResponse": "What to say when confused",
+    "escalationTriggers": ["Trigger 1", "Trigger 2"]
+  }
+}
+
+Create a comprehensive, production-ready chatbot configuration.
+RESPOND WITH VALID JSON ONLY.`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0.3,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error("No content received from OpenAI");
+      }
+
+      console.log("📄 Chatbot config response received");
+
+      // Parse the JSON response
+      const configJson = this.extractJSONFromResponse(
+        content,
+        "chatbot generation"
+      );
+
+      // Create the full config with metadata
+      const chatbotConfig: ChatbotConfig = {
+        id: `chatbot-${Date.now()}-${uuidv4().split("-")[0]}`,
+        name: configJson.name || "Unnamed Chatbot",
+        description: configJson.description || "No description provided",
+        personality: configJson.personality,
+        capabilities: configJson.capabilities || [],
+        conversationFlow: configJson.conversationFlow,
+        createdAt: new Date().toISOString(),
+      };
+
+      console.log(`✅ Chatbot config generated: ${chatbotConfig.name}`);
+      console.log(
+        `   Capabilities: ${chatbotConfig.capabilities?.length || 0}`
+      );
+
+      return chatbotConfig;
+    } catch (error) {
+      console.error("❌ Error generating chatbot config:", error);
+      throw new Error(
+        `Failed to generate chatbot config: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  private buildChatbotGenerationPrompt(
+    userDescription: string,
+    questions: string[],
+    answers: string
+  ): string {
+    return `Create a complete chatbot configuration based on this information:
+
+ORIGINAL DESCRIPTION:
+"${userDescription}"
+
+FOLLOW-UP QUESTIONS ASKED:
+${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+
+USER'S ANSWERS:
+"${answers}"
+
+REQUIREMENTS:
+1. Create a clear, descriptive name for the chatbot
+2. Write a comprehensive description of its purpose
+3. Define its personality/tone (friendly, professional, casual, etc.)
+4. List 3-5 key capabilities
+5. Design a conversation flow with:
+   - A welcoming greeting message
+   - 3-5 common questions users might ask with answers
+   - A fallback response for unclear queries
+   - Escalation triggers (when to hand off to human)
+
+Make this production-ready and comprehensive.
+RESPOND WITH COMPLETE JSON ONLY.`;
   }
 }
