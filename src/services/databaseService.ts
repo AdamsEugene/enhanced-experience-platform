@@ -16,7 +16,7 @@ export class DatabaseService {
         name: chatbotConfig.name,
         description: chatbotConfig.description,
         personality: chatbotConfig.personality,
-        status: "active", // Default to active
+        status: "inactive", // Default to inactive
         capabilities: chatbotConfig.capabilities || [],
         conversationFlow: chatbotConfig.conversationFlow || {},
       },
