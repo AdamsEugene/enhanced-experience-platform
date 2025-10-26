@@ -245,13 +245,13 @@ FIELD LAYOUT PATTERNS:
       }
 
       // Validate and sanitize shortName
-      let shortName = aiResult.shortName || "WIDGET";
+      let shortName = aiResult.shortName || "widget";
       shortName = shortName
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
         .slice(0, 12);
       if (shortName.length === 0) {
-        shortName = "WIDGET";
+        shortName = "widget";
       }
 
       console.log(`✅ Generated shortName: ${shortName}`);
@@ -347,7 +347,7 @@ CRITICAL RULES:
 RESPONSE FORMAT:
 Respond with ONLY valid JSON (no markdown, no explanations):
 {
-  "shortName": "12-char short name for this workflow (max 12 uppercase letters/numbers, e.g., HEALTHINSURE, ENROLLMENT, CLAIMFORM)",
+  "shortName": "Meaningful, descriptive name for this workflow (max 12 lowercase letters/numbers/hyphens, e.g., auth-widget, health-form, claim-enroll)",
   "pages": [
     {
       "pageId": "page-1",
@@ -365,7 +365,9 @@ Respond with ONLY valid JSON (no markdown, no explanations):
 }
 
 IMPORTANT: 
-- shortName must be EXACTLY 1-12 characters, uppercase letters/numbers only
+- shortName must be meaningful and descriptive (e.g., "auth-widget", "profile-form", "health-enroll")
+- shortName must be 1-12 characters: lowercase letters, numbers, and hyphens only
+- shortName should describe the purpose or main functionality of the workflow
 - For widgetConfig, ONLY include "title" and "subtitle" properties. Nothing else.`;
   }
 
