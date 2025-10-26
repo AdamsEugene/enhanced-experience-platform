@@ -18,6 +18,7 @@ model Chatbot {
   name             String
   description      String   @db.Text
   personality      String?  @db.Text
+  status           String   @default("active") // active or inactive
   capabilities     String[] // Array of capability strings
   conversationFlow Json     // Store the conversation flow as JSON
   createdAt        DateTime @default(now())

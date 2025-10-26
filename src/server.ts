@@ -207,15 +207,25 @@ app.get("/api/widgets", async (req, res) => {
     const offset = req.query.offset
       ? parseInt(req.query.offset as string)
       : undefined;
+    const status = req.query.status as string | undefined;
+
+    // Validate status if provided
+    if (status && !["active", "inactive"].includes(status)) {
+      const error: ErrorResponse = {
+        error: "Invalid status value. Must be 'active' or 'inactive'",
+      };
+      return res.status(400).json(error);
+    }
 
     const { recommendations, total } =
-      await DatabaseService.getAllWidgetRecommendations(limit, offset);
+      await DatabaseService.getAllWidgetRecommendations(limit, offset, status);
 
     res.json({
       recommendations,
       total,
       limit,
       offset,
+      status,
     });
   } catch (error) {
     console.error("Get widgets error:", error);
@@ -280,10 +290,7 @@ app.put("/api/widgets/:id", async (req, res) => {
     }
 
     // Validate shortName if provided
-    if (
-      shortName &&
-      (shortName.length > 6 || !/^[A-Z0-9]+$/.test(shortName))
-    ) {
+    if (shortName && (shortName.length > 6 || !/^[A-Z0-9]+$/.test(shortName))) {
       const error: ErrorResponse = {
         error: "Invalid shortName. Must be 1-6 uppercase letters/numbers only",
       };
@@ -548,13 +555,23 @@ app.get("/api/chatbots", async (req, res) => {
     const offset = req.query.offset
       ? parseInt(req.query.offset as string)
       : undefined;
+    const status = req.query.status as string | undefined;
+
+    // Validate status if provided
+    if (status && !["active", "inactive"].includes(status)) {
+      const error: ErrorResponse = {
+        error: "Invalid status value. Must be 'active' or 'inactive'",
+      };
+      return res.status(400).json(error);
+    }
 
     const { chatbots, total } = await DatabaseService.getAllChatbots(
       limit,
-      offset
+      offset,
+      status
     );
 
-    res.json({ chatbots, total, limit, offset });
+    res.json({ chatbots, total, limit, offset, status });
   } catch (error) {
     console.error("Get chatbots error:", error);
     const errorResponse: ErrorResponse = {
@@ -568,8 +585,14 @@ app.get("/api/chatbots", async (req, res) => {
 // Update a chatbot
 app.put("/api/chatbots/:id", async (req, res) => {
   try {
-    const { name, description, personality, capabilities, conversationFlow } =
-      req.body;
+    const {
+      name,
+      description,
+      personality,
+      status,
+      capabilities,
+      conversationFlow,
+    } = req.body;
 
     const chatbot = await DatabaseService.getChatbotById(req.params.id);
     if (!chatbot) {
@@ -577,10 +600,19 @@ app.put("/api/chatbots/:id", async (req, res) => {
       return res.status(404).json(error);
     }
 
+    // Validate status if provided
+    if (status && !["active", "inactive"].includes(status)) {
+      const error: ErrorResponse = {
+        error: "Invalid status value. Must be 'active' or 'inactive'",
+      };
+      return res.status(400).json(error);
+    }
+
     const updated = await DatabaseService.updateChatbot(req.params.id, {
       name,
       description,
       personality,
+      status,
       capabilities,
       conversationFlow,
     });

@@ -16,6 +16,7 @@ export class DatabaseService {
         name: chatbotConfig.name,
         description: chatbotConfig.description,
         personality: chatbotConfig.personality,
+        status: "active", // Default to active
         capabilities: chatbotConfig.capabilities || [],
         conversationFlow: chatbotConfig.conversationFlow || {},
       },
@@ -34,8 +35,13 @@ export class DatabaseService {
   /**
    * Get all chatbots
    */
-  static async getAllChatbots(limit?: number, offset?: number) {
+  static async getAllChatbots(
+    limit?: number,
+    offset?: number,
+    status?: string
+  ) {
     const chatbots = await prisma.chatbot.findMany({
+      where: status ? { status } : undefined,
       take: limit,
       skip: offset,
       orderBy: {
@@ -46,6 +52,7 @@ export class DatabaseService {
         name: true,
         description: true,
         personality: true,
+        status: true,
         capabilities: true,
         createdAt: true,
         updatedAt: true,
@@ -53,7 +60,9 @@ export class DatabaseService {
       },
     });
 
-    const total = await prisma.chatbot.count();
+    const total = await prisma.chatbot.count({
+      where: status ? { status } : undefined,
+    });
 
     return { chatbots, total };
   }
@@ -63,7 +72,9 @@ export class DatabaseService {
    */
   static async updateChatbot(
     id: string,
-    updates: Partial<Omit<ChatbotConfig, "id" | "createdAt">>
+    updates: Partial<Omit<ChatbotConfig, "id" | "createdAt">> & {
+      status?: string;
+    }
   ) {
     return await prisma.chatbot.update({
       where: { id },
@@ -71,6 +82,7 @@ export class DatabaseService {
         name: updates.name,
         description: updates.description,
         personality: updates.personality,
+        status: updates.status,
         capabilities: updates.capabilities,
         conversationFlow: updates.conversationFlow as any,
       },
@@ -128,8 +140,13 @@ export class DatabaseService {
   /**
    * Get all widget recommendations
    */
-  static async getAllWidgetRecommendations(limit?: number, offset?: number) {
+  static async getAllWidgetRecommendations(
+    limit?: number,
+    offset?: number,
+    status?: string
+  ) {
     const recommendations = await prisma.widgetRecommendation.findMany({
+      where: status ? { status } : undefined,
       take: limit,
       skip: offset,
       orderBy: {
@@ -149,7 +166,9 @@ export class DatabaseService {
       },
     });
 
-    const total = await prisma.widgetRecommendation.count();
+    const total = await prisma.widgetRecommendation.count({
+      where: status ? { status } : undefined,
+    });
 
     return { recommendations, total };
   }
