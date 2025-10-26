@@ -252,8 +252,15 @@ app.get("/api/widgets/:id", async (req, res) => {
 // Update a widget recommendation
 app.put("/api/widgets/:id", async (req, res) => {
   try {
-    const { userIntent, context, totalPages, flowDescription, pages } =
-      req.body;
+    const {
+      userIntent,
+      context,
+      shortName,
+      status,
+      totalPages,
+      flowDescription,
+      pages,
+    } = req.body;
 
     const widget = await DatabaseService.getWidgetRecommendationById(
       req.params.id
@@ -263,11 +270,29 @@ app.put("/api/widgets/:id", async (req, res) => {
       return res.status(404).json(error);
     }
 
+    // Validate status if provided
+    if (status && !["active", "inactive"].includes(status)) {
+      const error: ErrorResponse = {
+        error: "Invalid status value. Must be 'active' or 'inactive'",
+      };
+      return res.status(400).json(error);
+    }
+
+    // Validate shortName if provided
+    if (shortName && (shortName.length > 6 || !/^[A-Z0-9]+$/.test(shortName))) {
+      const error: ErrorResponse = {
+        error: "Invalid shortName. Must be 1-6 uppercase letters/numbers only",
+      };
+      return res.status(400).json(error);
+    }
+
     const updated = await DatabaseService.updateWidgetRecommendation(
       req.params.id,
       {
         userIntent,
         context,
+        shortName,
+        status,
         totalPages,
         flowDescription,
         pages,

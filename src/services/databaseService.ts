@@ -97,6 +97,8 @@ export class DatabaseService {
       data: {
         userIntent,
         context: context || null,
+        shortName: recommendation.shortName,
+        status: "active", // Default to active
         totalPages: recommendation.totalPages,
         flowDescription: recommendation.flowDescription,
         pages: recommendation.pages as any,
@@ -138,6 +140,8 @@ export class DatabaseService {
     updates: {
       userIntent?: string;
       context?: string;
+      shortName?: string;
+      status?: string;
       totalPages?: number;
       flowDescription?: string;
       pages?: any;
