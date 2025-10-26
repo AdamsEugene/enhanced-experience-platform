@@ -41,6 +41,16 @@ export class DatabaseService {
       orderBy: {
         createdAt: "desc",
       },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        personality: true,
+        capabilities: true,
+        createdAt: true,
+        updatedAt: true,
+        // Exclude conversationFlow field
+      },
     });
 
     const total = await prisma.chatbot.count();
@@ -124,6 +134,18 @@ export class DatabaseService {
       skip: offset,
       orderBy: {
         createdAt: "desc",
+      },
+      select: {
+        id: true,
+        userIntent: true,
+        context: true,
+        shortName: true,
+        status: true,
+        totalPages: true,
+        flowDescription: true,
+        createdAt: true,
+        updatedAt: true,
+        // Exclude pages field
       },
     });
 
