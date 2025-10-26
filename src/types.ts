@@ -320,7 +320,7 @@ export interface WidgetPage {
 export interface WidgetRecommendationResponse {
   success: boolean;
   message: string;
-  shortName: string; // AI-generated short name (max 6 chars)
+  shortName: string; // AI-generated short name (max 12 chars)
   pages: WidgetPage[];
   totalPages: number;
   flowDescription: string;

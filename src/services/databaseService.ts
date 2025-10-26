@@ -120,7 +120,7 @@ export class DatabaseService {
         userIntent,
         context: context || null,
         shortName: recommendation.shortName,
-        status: "active", // Default to active
+        status: "inactive", // Default to inactive
         totalPages: recommendation.totalPages,
         flowDescription: recommendation.flowDescription,
         pages: recommendation.pages as any,
