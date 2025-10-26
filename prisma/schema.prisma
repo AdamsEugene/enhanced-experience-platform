@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // uncomment next line if you use Prisma <5.10
+  // directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// Chatbot model
+model Chatbot {
+  id               String   @id @default(uuid())
+  name             String
+  description      String   @db.Text
+  personality      String?  @db.Text
+  capabilities     String[] // Array of capability strings
+  conversationFlow Json     // Store the conversation flow as JSON
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("chatbots")
+}
+
+// Widget Recommendation model
+model WidgetRecommendation {
+  id              String   @id @default(uuid())
+  userIntent      String   @db.Text
+  context         String?  @db.Text
+  totalPages      Int
+  flowDescription String   @db.Text
+  pages           Json     // Store pages array as JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("widget_recommendations")
+}
+
+// Chatbot Session model (for wizard flow)
+model ChatbotSession {
+  id              String   @id @default(uuid())
+  userDescription String   @db.Text
+  questions       String[] // Array of question strings
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime // Sessions expire after some time
+
+  @@map("chatbot_sessions")
+}

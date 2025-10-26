@@ -25,6 +25,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { ValidationService } from "./services/validationService";
 import { WidgetService } from "./services/widgetService";
+import DatabaseService from "./services/databaseService";
 
 // Load environment variables
 dotenv.config();
@@ -165,14 +166,182 @@ app.post("/api/widgets/recommend", async (req, res) => {
       context: context?.trim(),
     });
 
+    // Save to database
+    const savedRecommendation =
+      await DatabaseService.createWidgetRecommendation(
+        userIntent.trim(),
+        context?.trim(),
+        recommendations
+      );
+
     console.log(
-      `✅ Widget recommendations generated: ${recommendations.totalPages} pages`
+      `✅ Widget recommendations generated and saved: ${recommendations.totalPages} pages, ID: ${savedRecommendation.id}`
     );
-    res.json(recommendations);
+
+    // Add the database ID to the response
+    const responseWithId = {
+      ...recommendations,
+      id: savedRecommendation.id,
+    };
+
+    res.json(responseWithId);
   } catch (error) {
     console.error("Widget recommendation error:", error);
     const errorResponse: ErrorResponse = {
       error: "Failed to generate widget recommendations",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// ============== WIDGET CRUD ENDPOINTS ==============
+
+// Get all widget recommendations
+app.get("/api/widgets", async (req, res) => {
+  try {
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+    const offset = req.query.offset
+      ? parseInt(req.query.offset as string)
+      : undefined;
+
+    const { recommendations, total } =
+      await DatabaseService.getAllWidgetRecommendations(limit, offset);
+
+    res.json({
+      recommendations,
+      total,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error("Get widgets error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to retrieve widget recommendations",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Get a specific widget recommendation
+app.get("/api/widgets/:id", async (req, res) => {
+  try {
+    const widget = await DatabaseService.getWidgetRecommendationById(
+      req.params.id
+    );
+
+    if (!widget) {
+      const error: ErrorResponse = { error: "Widget recommendation not found" };
+      return res.status(404).json(error);
+    }
+
+    res.json(widget);
+  } catch (error) {
+    console.error("Get widget error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to retrieve widget recommendation",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Update a widget recommendation
+app.put("/api/widgets/:id", async (req, res) => {
+  try {
+    const { userIntent, context, totalPages, flowDescription, pages } =
+      req.body;
+
+    const widget = await DatabaseService.getWidgetRecommendationById(
+      req.params.id
+    );
+    if (!widget) {
+      const error: ErrorResponse = { error: "Widget recommendation not found" };
+      return res.status(404).json(error);
+    }
+
+    const updated = await DatabaseService.updateWidgetRecommendation(
+      req.params.id,
+      {
+        userIntent,
+        context,
+        totalPages,
+        flowDescription,
+        pages,
+      }
+    );
+
+    console.log(`✅ Widget recommendation updated: ${updated.id}`);
+    res.json(updated);
+  } catch (error) {
+    console.error("Update widget error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to update widget recommendation",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Delete a widget recommendation
+app.delete("/api/widgets/:id", async (req, res) => {
+  try {
+    const widget = await DatabaseService.getWidgetRecommendationById(
+      req.params.id
+    );
+    if (!widget) {
+      const error: ErrorResponse = { error: "Widget recommendation not found" };
+      return res.status(404).json(error);
+    }
+
+    await DatabaseService.deleteWidgetRecommendation(req.params.id);
+
+    console.log(`✅ Widget recommendation deleted: ${req.params.id}`);
+    res.json({
+      success: true,
+      message: "Widget recommendation deleted successfully",
+      id: req.params.id,
+    });
+  } catch (error) {
+    console.error("Delete widget error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete widget recommendation",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Delete all widget recommendations
+app.delete("/api/widgets", async (req, res) => {
+  try {
+    const { confirm } = req.query;
+    if (confirm !== "true") {
+      const error: ErrorResponse = {
+        error: "Confirmation required",
+        details:
+          "Add ?confirm=true to the URL to delete all widget recommendations",
+      };
+      return res.status(400).json(error);
+    }
+
+    const result = await DatabaseService.deleteAllWidgetRecommendations();
+
+    console.log(
+      `✅ All widget recommendations deleted: ${result.count} records`
+    );
+    res.json({
+      success: true,
+      message: "All widget recommendations deleted successfully",
+      deletedCount: result.count,
+    });
+  } catch (error) {
+    console.error("Delete all widgets error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete all widget recommendations",
       details: error instanceof Error ? error.message : "Unknown error",
     };
     res.status(500).json(errorResponse);
@@ -207,16 +376,14 @@ app.post("/api/chatbot-wizard/step1", async (req, res) => {
       userDescription.trim()
     );
 
-    // Create a session
+    // Create a session and save to database
     const sessionId = `chatbot-session-${Date.now()}-${uuidv4().split("-")[0]}`;
-    const session: ChatbotWizardSession = {
-      id: sessionId,
-      userDescription: userDescription.trim(),
-      questions: analysisResult.questions,
-      createdAt: new Date().toISOString(),
-    };
 
-    chatbotSessions.set(sessionId, session);
+    await DatabaseService.createChatbotSession(
+      sessionId,
+      userDescription.trim(),
+      analysisResult.questions || []
+    );
 
     const response: ChatbotWizardStep1Response = {
       success: true,
@@ -268,8 +435,8 @@ app.post("/api/chatbot-wizard/step2", async (req, res) => {
       return res.status(400).json(error);
     }
 
-    // Retrieve session
-    const session = chatbotSessions.get(sessionId);
+    // Retrieve session from database
+    const session = await DatabaseService.getChatbotSession(sessionId);
     if (!session) {
       const error: ErrorResponse = {
         error: "Session not found or expired",
@@ -287,8 +454,8 @@ app.post("/api/chatbot-wizard/step2", async (req, res) => {
       answers.trim()
     );
 
-    // Store the generated chatbot
-    generatedChatbots.set(chatbotConfig.id, chatbotConfig);
+    // Store the generated chatbot in database
+    await DatabaseService.createChatbot(chatbotConfig);
 
     // Generate chat link and phone number
     const chatLink = `https://chat.example.com/${chatbotConfig.id}`;
@@ -308,8 +475,8 @@ app.post("/api/chatbot-wizard/step2", async (req, res) => {
     console.log(`   Link: ${chatLink}`);
     console.log(`   Phone: ${phoneNumber}`);
 
-    // Clean up session
-    chatbotSessions.delete(sessionId);
+    // Clean up session from database
+    await DatabaseService.deleteChatbotSession(sessionId);
 
     res.json(response);
   } catch (error) {
@@ -323,29 +490,139 @@ app.post("/api/chatbot-wizard/step2", async (req, res) => {
 });
 
 // Get a specific chatbot by ID
-app.get("/api/chatbots/:id", (req, res) => {
-  const chatbotId = req.params.id;
-  const chatbot = generatedChatbots.get(chatbotId);
+app.get("/api/chatbots/:id", async (req, res) => {
+  try {
+    const chatbot = await DatabaseService.getChatbotById(req.params.id);
 
-  if (!chatbot) {
-    const error: ErrorResponse = { error: "Chatbot not found" };
-    return res.status(404).json(error);
+    if (!chatbot) {
+      const error: ErrorResponse = { error: "Chatbot not found" };
+      return res.status(404).json(error);
+    }
+
+    res.json(chatbot);
+  } catch (error) {
+    console.error("Get chatbot error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to retrieve chatbot",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
   }
-
-  res.json(chatbot);
 });
 
 // List all generated chatbots
-app.get("/api/chatbots", (req, res) => {
-  const chatbots = Array.from(generatedChatbots.values()).map((chatbot) => ({
-    id: chatbot.id,
-    name: chatbot.name,
-    description: chatbot.description,
-    createdAt: chatbot.createdAt,
-    capabilities: chatbot.capabilities,
-  }));
+app.get("/api/chatbots", async (req, res) => {
+  try {
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+    const offset = req.query.offset
+      ? parseInt(req.query.offset as string)
+      : undefined;
 
-  res.json({ chatbots, total: chatbots.length });
+    const { chatbots, total } = await DatabaseService.getAllChatbots(
+      limit,
+      offset
+    );
+
+    res.json({ chatbots, total, limit, offset });
+  } catch (error) {
+    console.error("Get chatbots error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to retrieve chatbots",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Update a chatbot
+app.put("/api/chatbots/:id", async (req, res) => {
+  try {
+    const { name, description, personality, capabilities, conversationFlow } =
+      req.body;
+
+    const chatbot = await DatabaseService.getChatbotById(req.params.id);
+    if (!chatbot) {
+      const error: ErrorResponse = { error: "Chatbot not found" };
+      return res.status(404).json(error);
+    }
+
+    const updated = await DatabaseService.updateChatbot(req.params.id, {
+      name,
+      description,
+      personality,
+      capabilities,
+      conversationFlow,
+    });
+
+    console.log(`✅ Chatbot updated: ${updated.id}`);
+    res.json(updated);
+  } catch (error) {
+    console.error("Update chatbot error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to update chatbot",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Delete a chatbot
+app.delete("/api/chatbots/:id", async (req, res) => {
+  try {
+    const chatbot = await DatabaseService.getChatbotById(req.params.id);
+    if (!chatbot) {
+      const error: ErrorResponse = { error: "Chatbot not found" };
+      return res.status(404).json(error);
+    }
+
+    await DatabaseService.deleteChatbot(req.params.id);
+
+    console.log(`✅ Chatbot deleted: ${req.params.id}`);
+    res.json({
+      success: true,
+      message: "Chatbot deleted successfully",
+      id: req.params.id,
+    });
+  } catch (error) {
+    console.error("Delete chatbot error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete chatbot",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Delete all chatbots
+app.delete("/api/chatbots", async (req, res) => {
+  try {
+    const { confirm } = req.query;
+    if (confirm !== "true") {
+      const error: ErrorResponse = {
+        error: "Confirmation required",
+        details: "Add ?confirm=true to the URL to delete all chatbots",
+      };
+      return res.status(400).json(error);
+    }
+
+    const result = await DatabaseService.deleteAllChatbots();
+
+    console.log(`✅ All chatbots deleted: ${result.count} records`);
+    res.json({
+      success: true,
+      message: "All chatbots deleted successfully",
+      deletedCount: result.count,
+    });
+  } catch (error) {
+    console.error("Delete all chatbots error:", error);
+    const errorResponse: ErrorResponse = {
+      error: "Failed to delete all chatbots",
+      details: error instanceof Error ? error.message : "Unknown error",
+    };
+    res.status(500).json(errorResponse);
+  }
 });
 
 // Helper function to generate a phone number
