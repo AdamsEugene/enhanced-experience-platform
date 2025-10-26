@@ -347,7 +347,7 @@ CRITICAL RULES:
 RESPONSE FORMAT:
 Respond with ONLY valid JSON (no markdown, no explanations):
 {
-  "shortName": "6-char short name for this workflow (max 6 uppercase letters/numbers, e.g., HLTHINS, ENROLL, CLAIM)",
+  "shortName": "6-char short name for this workflow (max 6 uppercase letters/numbers, e.g., HLTHIS, ENROLL, CLAIM)",
   "pages": [
     {
       "pageId": "page-1",

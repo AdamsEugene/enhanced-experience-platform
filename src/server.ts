@@ -178,10 +178,11 @@ app.post("/api/widgets/recommend", async (req, res) => {
       `✅ Widget recommendations generated and saved: ${recommendations.totalPages} pages, ID: ${savedRecommendation.id}`
     );
 
-    // Add the database ID to the response
+    // Add the database ID and status to the response
     const responseWithId = {
       ...recommendations,
       id: savedRecommendation.id,
+      status: savedRecommendation.status,
     };
 
     res.json(responseWithId);
