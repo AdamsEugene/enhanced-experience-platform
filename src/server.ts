@@ -280,9 +280,9 @@ app.put("/api/widgets/:id", async (req, res) => {
     }
 
     // Validate shortName if provided
-    if (shortName && (shortName.length > 6 || !/^[A-Z0-9]+$/.test(shortName))) {
+    if (shortName && (shortName.length > 12 || !/^[A-Z0-9]+$/.test(shortName))) {
       const error: ErrorResponse = {
-        error: "Invalid shortName. Must be 1-6 uppercase letters/numbers only",
+        error: "Invalid shortName. Must be 1-12 uppercase letters/numbers only",
       };
       return res.status(400).json(error);
     }
