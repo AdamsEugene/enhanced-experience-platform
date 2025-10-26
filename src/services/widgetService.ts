@@ -249,7 +249,7 @@ FIELD LAYOUT PATTERNS:
       shortName = shortName
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
-        .slice(0, 12);
+        .slice(0, 6);
       if (shortName.length === 0) {
         shortName = "WIDGET";
       }
@@ -347,7 +347,7 @@ CRITICAL RULES:
 RESPONSE FORMAT:
 Respond with ONLY valid JSON (no markdown, no explanations):
 {
-  "shortName": "12-char short name for this workflow (max 12 uppercase letters/numbers, e.g., HLTHIS, ENROLL, CLAIM)",
+  "shortName": "6-char short name for this workflow (max 6 uppercase letters/numbers, e.g., HLTHIS, ENROLL, CLAIM)",
   "pages": [
     {
       "pageId": "page-1",
@@ -365,7 +365,7 @@ Respond with ONLY valid JSON (no markdown, no explanations):
 }
 
 IMPORTANT: 
-- shortName must be EXACTLY 1-12 characters, uppercase letters/numbers only
+- shortName must be EXACTLY 1-6 characters, uppercase letters/numbers only
 - For widgetConfig, ONLY include "title" and "subtitle" properties. Nothing else.`;
   }
 
