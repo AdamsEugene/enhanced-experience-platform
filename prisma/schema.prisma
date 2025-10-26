@@ -18,7 +18,7 @@ model Chatbot {
   name             String
   description      String   @db.Text
   personality      String?  @db.Text
-  status           String   @default("active") // active or inactive
+  status           String   @default("inactive") // active or inactive
   capabilities     String[] // Array of capability strings
   conversationFlow Json     // Store the conversation flow as JSON
   createdAt        DateTime @default(now())
@@ -32,8 +32,8 @@ model WidgetRecommendation {
   id              String   @id @default(uuid())
   userIntent      String   @db.Text
   context         String?  @db.Text
-  shortName       String   @db.VarChar(6) // AI-generated short name (max 6 chars)
-  status          String   @default("active") // active or inactive
+  shortName       String   @db.VarChar(12) // AI-generated short name (max 12 chars)
+  status          String   @default("inactive") // active or inactive
   totalPages      Int
   flowDescription String   @db.Text
   pages           Json     // Store pages array as JSON
