@@ -41,7 +41,7 @@ app.use(
 
       // Define allowed origins
       const allowedOrigins = [
-        "*", // React default
+        "https://upgrade-latest.techhalo.ai", // React default
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3007",
