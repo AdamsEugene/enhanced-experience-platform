@@ -41,7 +41,8 @@ app.use(
 
       // Define allowed origins
       const allowedOrigins = [
-        "https://benefitsinacardwidget.techhalo.ai/",
+        "*",
+        "https://benefitsinacardwidget.techhalo.ai",
         "https://upgrade-latest.techhalo.ai", // React default
         "http://localhost:3000",
         "http://localhost:3001",
